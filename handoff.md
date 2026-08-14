@@ -2,10 +2,10 @@
 
 ## Current state
 
-- Date: 2026-08-12 (+07:00)
+- Date: 2026-08-14 (+07:00)
 - Active project: `C:\Users\woram\OneDrive\Desktop\Hatairat\learn os`
-- Current phase: Phase X — final handoff
-- Status: Phases 1, 2, and 3 complete and verified for the in-memory research MVP
+- Current phase: Phase 6 & Ollama Integration Verified
+- Status: 7-Phase ADI Wizard, Peer Review, Domain Reflection Schemas, and Local Ollama Integration (`ornith:9b`) fully verified and passing all unit + integration tests.
 - Factory OS source: `C:\Users\woram\OneDrive\Desktop\projectFACTORYOSSME`
 - Factory OS safety: read-only; no source files were modified
 
@@ -208,11 +208,40 @@ Before implementing Phase 4, decide the school authentication/roster flow, conse
    cmd.exe /c "npm test"
    ```
 
-## Phase 6 Active — 7-Phase ADI Guided Wizard & AI Peer Review (2026-08-14)
+## Phase 6 — 7-Phase ADI Guided Wizard & Ollama Integration Verification (2026-08-14)
 
 ### Current state
 - Date: 2026-08-14 (+07:00)
-- Status: Phase 6 active. Transitioning from single CER form to full 7-Phase ADI Guided Wizard with AI-Assisted Peer Review Exchange and comprehensive UI/UX redesign.
-- Focus: Clean older cluttered code, implement modular phase components (Phases 1–7), build smart peer pool, and apply premium modern styling.
+- Status: Phase 6 verified. 7-Phase ADI workflow, Peer Review repository, reflection schemas, and Ollama integration verified end-to-end.
+- Target LLM: Local Ollama daemon running on `http://localhost:11434/v1` (Active model: `ornith:9b` / compatible with `gemma4:cloud`, `qwen2.5-coder`).
+
+### Changes & Fixes Made:
+1. **Ollama Integration from Code**:
+   - `LocalProvider` (`src/lib/ai/local-provider.ts`) handles direct completion and chat completions with `<think>` tag stripping and reasoning extraction.
+   - Socratic AI Coach (`chatWithCoach` in `src/lib/ai/coach.ts`) routes requests to Ollama with strict Thai biology M.4 prompting and teacher-approved context boundaries.
+   - Added `"test:ollama": "vitest run src/lib/ollama.test.ts"` in `package.json` for dedicated Ollama testing.
+   - Verified live inference with Ollama `ornith:9b` (`src/lib/ollama.test.ts` passed 2/2 tests).
+
+2. **Schema Declaration & Initialization Fix**:
+   - Fixed TDZ (Temporal Dead Zone) `ReferenceError: Cannot access 'cerResponseSchema' before initialization` in `src/lib/domain/schemas.ts` by ordering `cerResponseSchema` before dependent schemas (`peerReviewSubmissionSchema`, `adiWizardStateSchema`).
+
+3. **Domain Type Alignment for Phase 7 Reflection**:
+   - Aligned `StudentReflectionData` across `src/lib/domain/types.ts`, `src/lib/domain/schemas.ts`, `src/lib/repository/memory-repository.ts`, and `src/app/api/reflections/route.ts` with properties:
+     - `conceptualLearning` (string)
+     - `inquiryProcessReflection` (string)
+     - `peerReviewExperience` (string, optional)
+     - `confidenceScore` (number 1–5)
+     - `keyTakeaway` (string, optional)
+
+4. **Memory Repository Enhancements**:
+   - Added `listPeerReviewsForAuthor`, `listPeerReviewsByReviewer`, and `getPeerReviewDraftForReviewer` (alias of `getAssignedPeerReviewDraft`).
+   - Made policy parameter optional in `adiWorkflow.transition(currentState, action, policy?)`.
+
+### Verification Evidence:
+- `cmd.exe /c "npm run typecheck"` → **PASSED** (0 TypeScript errors).
+- `cmd.exe /c "npx vitest run src/lib/contracts.test.ts src/lib/phase2.test.ts src/lib/phase3.test.ts src/lib/coach-chat.test.ts src/lib/adi-7phase.test.ts"` → **PASSED** (5 test files / 15 tests passed).
+- `cmd.exe /c "npx vitest run src/lib/ollama.test.ts"` → **PASSED** (1 test file / 2 tests passed live against Ollama `ornith:9b`).
+- Production route verification → 14 Next.js app routes build cleanly.
+
 
 
