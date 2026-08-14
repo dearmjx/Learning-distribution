@@ -49,3 +49,15 @@ Use a server-side provider adapter with DeepSeek V3/R1-compatible configuration 
 **Status:** open — research process
 
 Parent consent and student assent are required. The current research note should state the absence of IRB approval as a limitation until the applicable approval path is confirmed.
+
+## D-009 — Local Ollama LLM Engine
+
+**Status:** accepted and verified
+
+Support local OpenAI-compatible Ollama daemon (`http://localhost:11434/v1`) via `LocalProvider` with reasoning extraction, `<think>` tag sanitization, and fallback to MockProvider on connection errors. Configurable via `LEARNING_LLM_PROVIDER=local` and `LOCAL_LLM_MODEL=ornith:9b`.
+
+## D-010 — 7-Phase ADI Guided Wizard & Structured Reflection
+
+**Status:** accepted and verified
+
+Adopt 7 ADI learning phases (Orientation, Identification, Investigation, Argument, Peer Review, Revision, Reflection). Store phase reflections with structured dimensions (`conceptualLearning`, `inquiryProcessReflection`, `peerReviewExperience`, `confidenceScore`, `keyTakeaway`).

@@ -11,8 +11,9 @@ MVP ที่สามารถต่อยอดไปสู่ระบบท�
 - Research design: one-group pretest–posttest; หลีกเลี่ยง causal claim ที่เกินข้อมูล
 - AI Coach: ถามนำแบบ Socratic และไม่เขียนคำตอบแทนนักเรียน
 - Evidence: เก็บ draft, revision, AI interaction, peer review และ immutable timeline event
-- LLM: เรียกผ่าน provider abstraction เพื่อสลับ DeepSeek V3/R1 API หรือ mock provider ได้
+- LLM: เรียกผ่าน provider abstraction รองรับทั้ง Local Ollama (`ornith:9b`, `gemma4:cloud`), DeepSeek API (`deepseek-chat`), และ mock provider สำหรับ development/CI
 - Q4 point deduction: แยก `activity_score` กับ `ai_independence_score` ไว้ก่อนจนกว่าอาจารย์ยืนยัน
+- 7-Phase ADI Guided Wizard: ครอบคลุมการสำรวจ, ออกแบบการทดลอง, อภิปราย CER, Peer Review และ สะท้อนคิด (Reflection)
 
 ## Quick start
 
@@ -24,7 +25,31 @@ npm run dev
 
 เปิด `http://localhost:3000`
 
-ถ้าไม่มี `DEEPSEEK_API_KEY` ระบบจะใช้ mock provider สำหรับทดสอบ flow โดยไม่เรียก API ภายนอก
+### การตั้งค่า LLM ใน `.env.local`
+
+1. **ใช้ Local Ollama (ค่าเริ่มต้นแนะนำ):**
+   ```env
+   LEARNING_LLM_PROVIDER=local
+   LOCAL_LLM_BASE_URL=http://localhost:11434/v1
+   LOCAL_LLM_MODEL=ornith:9b
+   ```
+2. **ใช้ DeepSeek Cloud API:**
+   ```env
+   LEARNING_LLM_PROVIDER=deepseek
+   DEEPSEEK_API_KEY=your_api_key
+   ```
+3. **ใช้ Mock Provider (ไม่ใช้อินเทอร์เน็ต/ไม่ต้องรัน LLM):**
+   ```env
+   LEARNING_LLM_PROVIDER=mock
+   ```
+
+### คำสั่งทดสอบระบบ (Verification)
+
+```bash
+npm run typecheck       # ตรวจสอบ TypeScript compile errors
+npm test                # รัน unit test ทุก suite (Contracts, ADI 7-Phase, AI Coach, etc.)
+npm run test:ollama     # ทดสอบการเชื่อมต่อและสั่งการ Local Ollama จากโค้ดจริง
+```
 
 ## Project map
 
