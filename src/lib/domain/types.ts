@@ -16,8 +16,99 @@ export type AdiWorkflowState =
   | "ai_feedback_received"
   | "revising"
   | "peer_review"
+  | "revision"
+  | "reflection"
   | "teacher_review"
   | "completed";
+
+export interface InvestigationData {
+  question?: string;
+  variables?: {
+    independent?: string;
+    dependent?: string;
+    controlled?: string[];
+  };
+  procedure?: string;
+  observations?: string;
+  dataTable?: Array<Record<string, string | number>>;
+  notes?: string;
+}
+
+export interface PeerReviewScores {
+  claim: number;
+  evidence: number;
+  reasoning: number;
+}
+
+export interface PeerReviewSubmission {
+  id: string;
+  submissionId: string;
+  authorStudentId: string;
+  activityId: string;
+  anonymousAuthorAlias: string;
+  content: CerResponse;
+  investigationData?: InvestigationData;
+  submittedAt: string;
+  isSynthetic?: boolean;
+  misconceptionTag?: string;
+}
+
+export interface PeerReview {
+  id: string;
+  submissionId: string;
+  reviewerStudentId: string;
+  authorStudentId: string;
+  feedback: string;
+  createdAt: string;
+  activityId?: string;
+  peerReviewSubmissionId?: string;
+  scores?: PeerReviewScores;
+  strengths?: string;
+  suggestions?: string;
+}
+
+export interface PeerReviewEvaluation {
+  id: string;
+  peerReviewSubmissionId?: string;
+  submissionId: string;
+  reviewerStudentId: string;
+  authorStudentId: string;
+  activityId: string;
+  scores: PeerReviewScores;
+  strengths: string;
+  suggestions: string;
+  feedback: string;
+  createdAt: string;
+}
+
+export interface StudentReflectionData {
+  id?: string;
+  studentId: string;
+  activityId: string;
+  submissionId?: string;
+  analyticalThinkingScore?: number;
+  aiLiteracyScore?: number;
+  reflectionText?: string;
+  keyLearnings?: string[];
+  confidenceRating?: "low" | "medium" | "high";
+  conceptualLearning?: string;
+  inquiryProcessReflection?: string;
+  peerReviewExperience?: string;
+  confidenceScore?: number;
+  keyTakeaway?: string;
+  completedAt?: string;
+}
+
+
+export interface AdiWizardState {
+  currentPhase: AdiPhase;
+  completedPhases: AdiPhase[];
+  investigationData?: InvestigationData;
+  draftCer?: CerResponse;
+  activeSubmissionId?: string;
+  peerReviewId?: string;
+  reflectionData?: StudentReflectionData;
+}
 
 export interface LearningContext {
   schoolId: string;

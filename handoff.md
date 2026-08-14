@@ -208,15 +208,11 @@ Before implementing Phase 4, decide the school authentication/roster flow, conse
    cmd.exe /c "npm test"
    ```
 
-3. **Ollama Model Options:**
-   - Active model in `.env.local`: `gemma4:cloud` or `ornith:9b` or `gemma2:2b`.
-   - To check installed Ollama models: `cmd.exe /c "ollama list"`
-   - To test local Ollama server: `curl http://localhost:11434/api/tags`
+## Phase 6 Active — 7-Phase ADI Guided Wizard & AI Peer Review (2026-08-14)
 
-4. **Next Implementation Milestone (Phase 5):**
-   - Populate `src/data/course/ecosystem/knowledge-base.ts` with structured ม.4 Biology curriculum chunks.
-   - Implement the Hybrid RAG engine in `src/lib/knowledge/hybrid-rag.ts` (Thai BM25 + Vector + RRF).
-   - Implement the two-pass air-gapped Socratic coach in `src/lib/ai/coach.ts`.
-   - Run the adversarial prompt injection test suite.
+### Current state
+- Date: 2026-08-14 (+07:00)
+- Status: Phase 6 active. Transitioning from single CER form to full 7-Phase ADI Guided Wizard with AI-Assisted Peer Review Exchange and comprehensive UI/UX redesign.
+- Focus: Clean older cluttered code, implement modular phase components (Phases 1–7), build smart peer pool, and apply premium modern styling.
 
 

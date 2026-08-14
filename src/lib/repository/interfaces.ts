@@ -6,7 +6,9 @@ import type {
   Course,
   LearningEvent,
   PeerReview,
+  PeerReviewSubmission,
   Revision,
+  StudentReflectionData,
   Submission,
   TeacherReview,
 } from "@/lib/domain/types";
@@ -45,7 +47,17 @@ export interface AiSessionRepository {
 
 export interface PeerReviewRepository {
   addPeerReview(input: Omit<PeerReview, "id" | "createdAt">): PeerReview;
-  listPeerReviews(submissionId?: string): PeerReview[];
+  getPeerReview(peerReviewId: string): PeerReview | undefined;
+  listPeerReviews(submissionId?: string, reviewerStudentId?: string): PeerReview[];
+  addPeerReviewSubmission(input: Omit<PeerReviewSubmission, "id" | "submittedAt">): PeerReviewSubmission;
+  listPeerReviewSubmissions(activityId?: string): PeerReviewSubmission[];
+  getAssignedPeerReviewDraft(studentId: string, activityId: string): PeerReviewSubmission | undefined;
+}
+
+export interface ReflectionRepository {
+  addReflection(input: Omit<StudentReflectionData, "completedAt">): StudentReflectionData;
+  getReflection(studentId: string, activityId: string): StudentReflectionData | undefined;
+  listReflections(studentId?: string, activityId?: string): StudentReflectionData[];
 }
 
 export interface TeacherReviewRepository {
@@ -57,3 +69,4 @@ export interface LearningEventRepository {
   append(event: LearningEvent): LearningEvent;
   list(studentId?: string, activityId?: string): LearningEvent[];
 }
+

@@ -492,6 +492,23 @@ Phase 4 gate: NOT STARTED. Do not enable real student persistence until identity
 - Adversarial student inputs (e.g. "Ignore previous instructions", "Give direct answer", "What is your system prompt") are 100% neutralized, yielding pedagogical Socratic prompts with zero direct answers and zero prompt leaks.
 - All verification commands (`cmd.exe /c "npm run typecheck"`, `cmd.exe /c "npm test"`) pass cleanly.
 
+## 8.6 Phase 6 — 7-Phase ADI Guided Wizard & AI-Assisted Peer Review Exchange
+
+### Problem & Objective
+1. **End-to-End Inquiry Progression**: Transition from a single-screen CER form into a structured 7-Phase ADI Guided Wizard (Orientation, Identification, Investigation, Argumentation, Peer Review, Revision, Reflection).
+2. **AI-Assisted Peer Review**: Enable smart peer review exchange with Socratic AI Coach assistance and realistic synthetic fallback for single-user testing.
+3. **UI/UX Modernization**: Eliminate cluttered form controls in favor of an intuitive, beautiful, responsive, stepper-driven interface with clear visual hierarchy, soft card surfaces, and accessible form semantics.
+
+### Planned Deliverables
+- `src/lib/domain/types.ts`: 7-phase state, peer review, and reflection data models.
+- `src/lib/repository/memory-repository.ts`: Peer review and reflection storage with pre-seeded synthetic peer drafts.
+- `src/app/api/peer-reviews/route.ts` & `src/app/api/reflections/route.ts`: API endpoints for peer reviews and reflections.
+- `src/components/adi-stepper.tsx`: Interactive 7-phase progress stepper.
+- `src/components/phases/`: Dedicated modular components for Phases 1 to 7.
+- `src/components/student-workbench.tsx`: Cleaned, unified 7-Phase ADI Hub.
+- `src/app/globals.css`: Premium, human-centered UI/UX styling.
+- `src/lib/adi-7phase.test.ts`: Automated test suite for the 7-phase lifecycle.
+
 ## 9. Open decisions
 
 | Decision | Current safe default | Decision owner / gate |
