@@ -137,6 +137,9 @@ export class InMemoryLearningRepository
   getSubmission(submissionId: string): Submission | undefined { return submissions.find((submission) => submission.id === submissionId); }
   listSubmissions(studentId?: string, activityId?: string): Submission[] { return listSubmissions(studentId, activityId); }
   latestSubmission(studentId: string, activityId: string): Submission | undefined { return latestSubmission(studentId, activityId); }
+  updateSubmissionWorkflow(submissionId: string, workflowState: Submission["workflowState"]): Submission | undefined {
+    return updateSubmissionWorkflow(submissionId, workflowState);
+  }
   addRevision(input: Omit<Revision, "id" | "createdAt">): Revision { return addRevision(input); }
   listRevisions(submissionId: string): Revision[] { return listRevisions(submissionId); }
   createSession(input: Omit<AiSession, "id" | "startedAt">): AiSession { return createAiSession(input); }
@@ -158,6 +161,12 @@ export class InMemoryLearningRepository
 export function addSubmission(
   submission: Omit<Submission, "id" | "submittedAt">,
 ): Submission {
+  if (submission.idempotencyKey) {
+    const existing = submissions.find(
+      (item) => item.studentId === submission.studentId && item.idempotencyKey === submission.idempotencyKey,
+    );
+    if (existing) return existing;
+  }
   const record: Submission = {
     ...submission,
     id: crypto.randomUUID(),
@@ -171,7 +180,23 @@ export function getSubmission(submissionId: string): Submission | undefined {
   return submissions.find((submission) => submission.id === submissionId);
 }
 
+export function updateSubmissionWorkflow(
+  submissionId: string,
+  workflowState: Submission["workflowState"],
+): Submission | undefined {
+  const submission = getSubmission(submissionId);
+  if (!submission) return undefined;
+  submission.workflowState = workflowState;
+  return submission;
+}
+
 export function addRevision(input: Omit<Revision, "id" | "createdAt">): Revision {
+  if (input.idempotencyKey) {
+    const existing = revisions.find(
+      (item) => item.studentId === input.studentId && item.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing) return existing;
+  }
   const record: Revision = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
   revisions.push(record);
   return record;
@@ -353,4 +378,3 @@ export function clearMemoryRepositoriesForTests(): void {
 }
 
 export const learningRepository = new InMemoryLearningRepository();
-

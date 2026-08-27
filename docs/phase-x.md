@@ -1,8 +1,8 @@
 # Phase X — Factory OS to Learning OS Migration and Execution Plan
 
-> Updated: 2026-08-14 10:56 (+07:00)
+> Updated: 2026-08-23 21:31 (+07:00)
 >
-> Status at this update: Comprehensive repository audit and customer documentation suite completed; Phase 5 architectural plan accepted for Grade 10 (ม.4) Biology Insight Data, Hybrid RAG Engine (Dense + Sparse BM25 + RRF), and Multi-Layer Prompt Isolation & Anti-Distraction Guardrails. Factory OS remains read-only.
+> Status at this update: Current Gemini work audited, local runtime smoke-tested, and an opt-in password-protected demo mode implemented. The clean production server loads on `http://localhost:3000`, the 7-phase demo UI, typecheck, unit suite, and production build pass; Supabase persistence/auth/RLS integration is not ready for real student data. Factory OS remains read-only.
 
 This document is the current source of truth for the Learning OS migration. Learning OS is a separate education project derived from patterns observed in Factory OS. It is not a renamed Factory OS copy, and no education code is added to Factory OS.
 
@@ -20,7 +20,7 @@ Learning OS is a research prototype for Grade 10 biology using ADI and a Socrati
 | Research design | One-group pretest–posttest; no unsupported causal claim |
 | Teacher authority | Teacher assigns the final academic score and comment |
 | AI role | Socratic questions and evidence-grounded hints; never the final grader |
-| Persistence | In-memory MVP complete; Phase 4 plans Supabase/Postgres/Auth/RLS for pilot readiness |
+| Persistence | In-memory runtime remains active; Supabase artifacts exist but the audited Phase 4/7 gate is not passed |
 | LLM default | Mock provider; local provider is opt-in; DeepSeek is not enabled in this execution |
 
 Non-negotiable rules:
@@ -363,7 +363,7 @@ Phase 3 gate: PASSED. Phases 1–3 are complete for the in-memory research MVP.
 
 ### Phase 4 — Supabase identity, persistence, and per-student isolation
 
-Status: PLANNED — not executed. No Supabase project, migration, authentication change, real credential, or real student data has been added to Learning OS in this step.
+Status: PARTIAL — artifacts were added by Gemini, but authentication, route integration, RLS isolation, and database verification are not complete.
 
 #### Recommended boundary
 
@@ -509,12 +509,171 @@ Phase 4 gate: NOT STARTED. Do not enable real student persistence until identity
 - `src/app/globals.css`: Premium, human-centered UI/UX styling.
 - `src/lib/adi-7phase.test.ts`: Automated test suite for the 7-phase lifecycle.
 
+## 8.7 Current Gemini work audit — 2026-08-23
+
+Audit scope: current `main` at `bd39397` plus the uncommitted working tree. The audit preserved all implementation changes and did not read or modify Factory OS.
+
+### Verification actually run
+
+- `git status --short --branch` → `main...origin/main`; 18 tracked files modified and new Supabase/repository/telemetry files present, plus untracked `pptx_edit_tmp/`.
+- `cmd.exe /c "npm run typecheck"` → passed with exit code 0.
+- `cmd.exe /c "npm test"` → passed: 8 test files / 22 tests.
+- `cmd.exe /c "npm run build"` → passed: Next.js 15.5.23 generated 15 routes.
+- `git diff --check` → reported one blank line at EOF in `src/app/globals.css`; no other whitespace errors were reported.
+- Static client-bundle scan → 0 references to `SUPABASE_SERVICE_ROLE_KEY` or `service_role` in `.next/static`.
+- Supabase CLI → absent; `supabase/config.toml` is absent; no migration/RLS database test was run.
+- Ollama listener on `localhost:11434` during this audit → absent. The Ollama tests catch connection failures and still pass, so the 2 Ollama tests are not live-inference evidence for this audit.
+- Vitest process environment had no Supabase or LLM variables; Supabase adapter tests therefore exercise the in-memory fallback branch, not a live Supabase database.
+
+### Findings
+
+1. **P0 — Do not use with real student data: RLS is not class-scoped.** `is_teacher()` grants access to every student row for any profile with a teacher/researcher/admin role, and the policies use `OR is_teacher()` without checking an active class membership. The schema has no membership table or foreign-key path for this decision. See `supabase/migrations/001_initial_schema.sql` and `supabase/migrations/002_row_level_security.sql`.
+2. **P0 — Peer-review RPC does not bind the caller to the supplied student.** `get_assigned_peer_review_draft` is `SECURITY DEFINER`, accepts `p_reviewer_student_id` from the caller, and does not verify `auth.uid()` or revoke public execution. It can query submissions outside the caller's class scope. See `supabase/migrations/003_peer_review_rpc.sql`.
+3. **P1 — Supabase persistence is not wired into production routes.** Four API routes still import `@/lib/repository/memory-repository`; no API route imports `repository/index` or `supabase-repository`. `GET /api/health` also hardcodes `persistence: "in-memory-mvp"`. The feature flag currently selects an unused adapter.
+4. **P1 — The adapter bypasses RLS and trusts domain IDs.** `supabase-repository.ts` constructs its client from `SUPABASE_SERVICE_ROLE_KEY`, then filters by caller-provided `studentId`. The server session client does not read cookies or resolve `auth.uid()`, so the planned Auth → membership → `LearningContext` boundary is absent.
+5. **P1 — Database errors silently become memory writes.** Most adapter methods fall back to the in-memory repository on any Supabase error. A successful database write followed by a response/read error can therefore create a second local record and return success while durable state is uncertain. This is unsafe for submissions, revisions, reviews, and consent-sensitive evidence.
+6. **P1 — Integration tests are false-green when external services are unavailable.** `supabase-repository.test.ts` is passing against memory because the Vitest process has no Supabase environment; `ollama.test.ts` catches connection failures and asserts only that the provider name is local. These tests need explicit skip/required modes and a real local Supabase two-student RLS test before Phase 7 can pass.
+7. **P1 — The database foundation is incomplete relative to the approved Phase 4 contract.** There are no schools/courses/classrooms/memberships, activities, AI sessions/interactions, consent records, research participant keys, or correlation/occurred-at event columns. There are also no uniqueness/idempotency constraints for submission versions and event retries.
+8. **P2 — Peer-review authorization remains client/domain-ID driven.** The API accepts `studentId`, `reviewerStudentId`, `authorStudentId`, and submission identifiers from the request and validates only the demo scope/self-review check. The database policies do not verify assignment/activity consent or prevent an author from learning reviewer identity through the raw row.
+9. **P2 — Phase 8 diagnostics are demo-only and privacy-sensitive.** Student IDs are user-editable and persisted in `localStorage`; the browser diagnostic logger records prompt text and can copy recent logs. The UI labels the model `ornith:9b` even when the configured provider/model differs. This needs a privacy policy and authenticated identity boundary before classroom use.
+
+### Audit decision
+
+The 7-phase ADI UI and local demo changes are acceptable as prototype work, subject to normal product review. Supabase Phase 4/7 is **NOT READY** and must not be marked complete or enabled for real students. The next implementation order is: add authenticated session/membership resolution; redesign class-scoped RLS; lock down the RPC; wire routes through a persistence port; remove silent database-error fallback; add local Supabase integration tests with two students and one teacher; then rerun the full gate.
+
+## 8.8 Runtime loading, caching, and bundle audit — 2026-08-23
+
+This was a read-only runtime check requested after the Gemini audit. “Bone pacment” was interpreted as bundle/performance placement. No application source, Factory OS file, secret, or generated artifact was copied between repositories.
+
+### Actual smoke-test evidence
+
+- The first development check started `npm run dev` on port 3000. The browser loaded the homepage with title `Learning OS — Ecosystem ADI`, rendered the ADI 7-phase activity, and reported no browser console errors. `GET /` returned HTTP 200.
+- A clean `cmd.exe /c "npm run build"` was run after stopping all servers. It passed and generated the 15-route production build; the Next report showed 123 kB first-load JavaScript for `/` and 103 kB shared JavaScript.
+- The final `cmd.exe /c "npm run start"` is running on `http://localhost:3000` against that clean production build.
+- Final browser smoke test: `http://localhost:3000/` rendered the full homepage and reported no console errors.
+- Final HTTP check: `GET /` → 200 in approximately 176 ms, 10,173 bytes, `Cache-Control: s-maxage=31536000`, with an ETag.
+- Final and latest health recheck at 21:15 (+07:00): `GET /api/health` → 200, JSON `status: "ok"`, `llmProvider: "local"`, and `persistence: "in-memory-mvp"`. It has no explicit `Cache-Control` header or ETag.
+- Final hashed JavaScript check: `/_next/static/chunks/framework-085cf39580498177.js` → 200, 189,765 bytes, `Cache-Control: public, max-age=31536000, immutable`, with an ETag.
+- Production `.next/static` contained 32 files totaling approximately 896.9 KiB. The earlier development `.next/static` measured approximately 8.8 MiB because it included HMR/dev tooling and is not a production bundle-size measure.
+
+### Runtime conclusions
+
+1. The site is currently loading on port 3000 through the clean production server. The health route is reachable, but its response correctly exposes the current limitation: runtime persistence is still in-memory.
+2. Production HTML and hashed static assets have long-lived caching. The health API has no explicit cache policy; it should be reviewed before real student data or authenticated identity is enabled.
+3. The production bundle is materially smaller than the development HMR output. The build report is the authoritative first-load measure; do not use the 7.6 MiB development `main-app.js` as the production size.
+4. `next.config.ts` has no custom cache headers or application cache layer. Supabase/LLM response caching is not implemented and should not be added until identity, privacy, and event-consistency decisions are approved.
+5. Do not run `next dev` concurrently with `next build` or `next start` in this project: all modes share `.next`, and the earlier overlap temporarily corrupted the dev/production generated output. The servers were stopped, the build was rerun cleanly, and only the final production server was left running.
+
+## 8.9 Password-protected demo mode — 2026-08-23
+
+Status: **IMPLEMENTED and HTTP-tested; disabled in the current local environment until the owner chooses a password.** This feature is for local presentation/demo access, not real student authentication.
+
+### Behavior
+
+- When `DEMO_MODE_ENABLED=true`, unauthenticated page requests redirect to `/demo` and unauthenticated API requests return HTTP 401.
+- One server-side password unlocks the existing student workspace, teacher review, analytics, timeline, and demo API surfaces through one signed session cookie.
+- `/api/health`, static assets, `/demo`, and demo login/logout endpoints remain reachable so the gate can load and be monitored.
+- When the flag is absent or false, the existing Learning OS behavior remains unchanged. The current server on `http://localhost:3000` is in this normal mode.
+
+### Configuration
+
+Add these values to the uncommitted `.env.local` file; never commit or expose the password:
+
+```text
+DEMO_MODE_ENABLED=true
+DEMO_MODE_PASSWORD=<choose-a-local-demo-password>
+DEMO_MODE_SESSION_SECRET=<choose-a-random-server-secret>
+```
+
+After changing the values, restart development mode or rebuild and restart the production server. The password and session secret are not included in client code, HTML, logs, or `.env.example` values.
+
+### Implementation files
+
+- `src/lib/demo-mode.ts` — HMAC password/session verification and eight-hour expiry.
+- `src/middleware.ts` — opt-in route gate for pages and API requests.
+- `src/app/demo/page.tsx` and `src/components/demo-login-form.tsx` — password entry and unlocked demo landing page.
+- `src/app/api/demo/login/route.ts` — server-side password check and HttpOnly cookie.
+- `src/app/api/demo/logout/route.ts` — cookie removal and return to the gate.
+- `.env.example` — placeholders only; no real secret was added.
+- `src/lib/demo-mode.test.ts` — password, signing, expiry, tamper, and enable-flag tests.
+
+### Verification actually run
+
+- `cmd.exe /c "npm run typecheck"` → **PASSED**.
+- `cmd.exe /c "npm test"` → **PASSED**, 9 test files / 25 tests.
+- Temporary test-only `npm run build` with demo variables → **PASSED**, 19 generated pages and middleware.
+- Temporary HTTP smoke test on port 3100: root before login → 307 to `/demo`; demo page → 200; API before login → 401; wrong password → 401; correct password → 200; API after login → 200; teacher review after login → 200; health → 200. Only the cookie name `learning_os_demo` was inspected; its value was never printed.
+- Clean normal `npm run build` after the smoke test → **PASSED**. The normal frontend was restarted on port 3000 and rendered without browser errors.
+
+### Boundaries and remaining decisions
+
+- Demo mode is a presentation gate, not a replacement for Supabase Auth, class membership, RLS, consent, or teacher authorization. Do not use it with real student data.
+- The password grants access to the existing prototype surfaces; it does not turn in-memory persistence into durable per-student storage.
+- Choose the actual demo password and session-secret handling before enabling the flag on any shared or deployed environment.
+
+## Future implementation phases
+
+### Phase 9 — Authenticated Supabase persistence for each student
+
+Status: **IN PROGRESS; application boundary and education migration/RLS/RPC slice implemented, verification gate still open.** Do not use the password-protected demo gate as a substitute for this phase.
+
+Objective: replace client-supplied demo identity and in-memory writes with authenticated, class-scoped, durable Learning OS records while preserving the mock/local AI path.
+
+Deliverables:
+
+- Supabase Auth session handling with a server-side `auth.uid()` → `LearningContext` resolver.
+- Education-only tables and migrations for schools, courses, classes, memberships, activities, submissions, revisions, AI sessions/interactions, hints, peer reviews, teacher reviews, learning events, consent, and research identity mapping.
+- Class-scoped RLS policies tested with two students, one teacher, and an unauthorized user.
+- Locked-down peer-review RPC bound to the authenticated reviewer and assigned class/activity.
+- Repository and event-store ports wired into every API route; no silent Supabase-to-memory fallback after the gate.
+- Durable event correlation, idempotency, occurred-at timestamps, versioning, export separation, retention, deletion, and consent withdrawal rules.
+- Authenticated student/teacher UI states and a rollback switch that keeps memory mode available for local development.
+
+Acceptance criteria:
+
+- Two synthetic students can use the same activity while each can read and write only their own submissions, revisions, AI interactions, hints, and timeline events.
+- A teacher can access only the approved class scope; changing browser `studentId`, `classId`, role, or reviewer IDs cannot cross the server or RLS boundary.
+- Restarting the app does not lose accepted synthetic records; retries do not duplicate submissions or learning events.
+- Teacher review remains the final academic decision; authorship indicators remain review signals; no AI grading is introduced.
+- Research export separates identity mapping from evidence and contains no raw identity in evidence rows.
+- `cmd.exe /c "npm run typecheck"`, `cmd.exe /c "npm test"`, `cmd.exe /c "npm run build"`, route smoke tests, and live local Supabase isolation tests pass.
+
+Phase 9 blockers: live Supabase CLI/Docker verification, route-level two-student tests, restart durability evidence, and approved school authentication/consent/retention/data-residency decisions remain open before real student data is allowed.
+
+### Phase 10 — Pilot readiness, performance, caching, and deployment
+
+Status: **PLANNED; begin only after the Phase 9 gate passes.**
+
+Objective: make one approved activity safe and observable for a small synthetic/consented pilot, with predictable performance and a reversible deployment path.
+
+Deliverables:
+
+- Teacher pilot workflow: class roster, activity assignment, review queue, final score/comment, peer-review moderation, and export approval.
+- Production safety: environment validation, rate limits, request IDs, structured audit events, error boundaries, health/readiness checks, secret scans, and safe provider fallback.
+- Cache policy: immutable caching for hashed static assets; `no-store` for authenticated student/teacher/API responses; only cache versioned approved activity context or explicitly consented aggregate analytics; never cache raw student work or personalized AI responses across students.
+- Bundle/performance budgets and route smoke measurements for student and teacher flows; fix regressions before deployment.
+- Deployment plan with separate development/staging/production environments, Supabase migration ordering, backup/restore rehearsal, rollback to memory/mock mode, and demo-mode isolation.
+- Privacy/pilot checklist covering consent, deletion, export, support contacts, data residency, incident response, and classroom access roles.
+
+Acceptance criteria:
+
+- A synthetic pilot can complete the full activity from draft through teacher review without data leakage or lost events.
+- No browser bundle contains service-role, LLM, or other server-only secrets; API keys remain server-side.
+- Cache headers match the approved policy, authenticated data is not served from a shared cache, and a second student never receives the first student’s response.
+- Health/readiness checks distinguish app availability, database availability, and provider availability without claiming persistence or LLM readiness that was not verified.
+- Build, tests, security checks, export-separation checks, performance checks, and deployment rollback checks pass from a clean checkout/build directory.
+- Demo mode remains clearly labeled, opt-in, and unavailable for real student data.
+
+Phase 10 blockers: Phase 9 identity/RLS must pass first; production deployment also requires an approved school pilot, consent/retention decision, infrastructure owner, and rollback contact.
+
+Token-saving order for these phases: finish the Phase 9 identity/RLS slice and two-student tests first; wire only the routes used by the first activity; then add Phase 10 cache/security/observability controls; defer broad analytics, multi-course support, and additional AI providers until the pilot gate passes.
+
 ## 9. Open decisions
 
 | Decision | Current safe default | Decision owner / gate |
 |---|---|---|
 | DeepSeek vs local model | Mock now; local adapter next; DeepSeek explicit opt-in | Technical owner + advisor |
-| Supabase/Postgres timing | Phase 4 is planned; memory remains the default until the Phase 4 gate passes | Technical owner |
+| Supabase/Postgres timing | Artifacts exist, but memory remains the runtime until the audited Phase 4/7 gate passes | Technical owner |
 | Supabase environment boundary | One project per environment with per-student RLS; not one project per student | Technical owner + school |
 | Authentication and class roster | Demo identity until the school selects an auth/invite/SSO and roster source | School/advisor before pilot |
 | Student/guardian consent | No real student data until consent scope, withdrawal, retention, and deletion are approved | School/advisor/research owner |
@@ -532,8 +691,11 @@ Phase 4 gate: NOT STARTED. Do not enable real student persistence until identity
 - Live Factory OS telemetry and Phase 5 database gates are irrelevant to the Learning OS MVP and must not be pulled into it.
 - Learning OS dependencies are installed for the current MVP; the recorded install timed out after adding the declared packages and reported 8 audit vulnerabilities. No automatic dependency fix was run.
 - In-memory data is not durable and is not suitable for real student data.
-- No authentication/consent/retention implementation exists yet; before pilot, add server-controlled identity, class membership, RLS, consent, and export controls.
+- No real student authentication/consent/retention implementation exists yet; the current password gate is demo-only. Before pilot, add server-controlled identity, class membership, RLS, consent, and export controls.
 - Supabase RLS can appear correct while an application route still trusts client-supplied IDs; direct database tests and route-level two-student isolation tests are both required.
+- Current Gemini Supabase migrations use a broad teacher predicate and an unbound `SECURITY DEFINER` peer-review RPC; treat the database as unsafe until those policies are replaced and tested.
+- Current API routes still use memory repositories and the health route reports memory persistence regardless of the feature flag.
+- Current external-service tests can pass when Supabase/Ollama is unavailable; live integration evidence is still missing.
 - Minor/student privacy, consent withdrawal, retention, deletion, backup restore, data residency, and school roster integration are unresolved Phase 4 gates.
 - Provider output can be malformed or unsafe; fallback and schema/safety checks are required on every path.
 
@@ -565,3 +727,46 @@ After every meaningful step and at every phase boundary, update `handoff.md` wit
 If a different LLM continues this task, it must read `agent.md`, then `handoff.md`, then this document before editing. It must not infer completion from old notes or from a plan checkbox.
 
 **Factory OS remains read-only.**
+
+## Phase 9 implementation log — 2026-08-23
+
+Current status: IN PROGRESS. This log records implementation evidence only; Phase 9 acceptance criteria are not yet marked complete.
+
+Implemented in the Learning OS workspace:
+
+- Server-side Supabase SSR client with cookie-backed sessions and an auth callback. `auth.uid()` is resolved to `learning_profiles`, active `memberships`, class/course scope, and a `LearningContext`.
+- Explicit local-memory identity for development and rollback only. Browser `studentId`, `teacherId`, `classId`, and role values are not used as authorization sources.
+- Request-scoped repository factory. Supabase mode uses the SSR client and RLS; database errors are surfaced instead of silently writing to memory. Memory mode remains explicit and non-durable.
+- First-activity route wiring for submissions, revisions, learning events, timelines, AI sessions/interactions, teacher review, peer-review assignment, reflection, Coach events, activity access, research export, and health status.
+- Education-only migration `005_phase9_education_model.sql` for schools, courses, classes, learning profiles, memberships, activity assignments, AI sessions/interactions, hints, consent records, and a protected research identity map, plus scope/idempotency columns on evidence tables.
+- `006_phase9_rls.sql` replaces broad prototype policies with `auth.uid()`/membership/class/activity checks, append-only learning-event access, and restricted research identity access.
+- `007_phase9_peer_review_rpc.sql` removes the caller-supplied reviewer argument, binds assignment to `auth.uid()`, checks class/activity assignment, redacts peer authorship, and adds an auth-bound peer-review submission RPC with explicit execute grants.
+- `supabase/tests/phase9_isolation.sql` and `npm run test:db` provide a live database isolation test path. The command reports an explicit skip when the Supabase CLI is absent.
+
+Files intentionally excluded: Factory OS files, Factory OS schema/data, real student records, real credentials, and Phase 10 pilot/deployment work.
+
+Verification actually run for this log:
+
+- `cmd.exe /c "npm run typecheck"` → PASSED (0 errors).
+- No live Supabase migration/RLS test has been run yet; CLI/Docker availability remains to be checked.
+- Unit and build suites have not yet been rerun after the Phase 9 route/schema changes.
+
+Exact next step: add the two-student/teacher/tampering/idempotency unit coverage, run `npm run test:db` and record whether it is skipped or passes, then run the full typecheck/test/build/diff verification.
+
+## Phase 10 implementation log — 2026-08-26
+
+Current status: Teacher Pilot Operations slice (Roster, CER Rubric Evaluation, De-identified Research Export) COMPLETE.
+
+Implemented in the Learning OS workspace:
+- Extended domain contracts and schemas for granular CER rubric evaluation (`claim`, `evidence`, `reasoning` levels 1-4) in [`TeacherReview`](file:///c:/Users/woram/OneDrive/Desktop/Hatairat/learn%20os/src/lib/domain/types.ts).
+- Class roster, activity assignment, and student ADI progress tracking endpoint [`/api/teacher/roster`](file:///c:/Users/woram/OneDrive/Desktop/Hatairat/learn%20os/src/app/api/teacher/roster/route.ts) with `Cache-Control: no-store, private` headers.
+- Interactive Teacher Class Roster page [`/teacher/roster`](file:///c:/Users/woram/OneDrive/Desktop/Hatairat/learn%20os/src/app/teacher/roster/page.tsx) with ADI stage badges and direct links to student evidence.
+- Upgraded Teacher Review Queue [`/teacher/review`](file:///c:/Users/woram/OneDrive/Desktop/Hatairat/learn%20os/src/app/teacher/review/page.tsx) with CER rubric buttons, 100-point total calculator, submission search/filters, and expandable Socratic interaction & revision diff logs.
+- Interactive Research Export in [`/teacher/analytics`](file:///c:/Users/woram/OneDrive/Desktop/Hatairat/learn%20os/src/app/teacher/analytics/page.tsx) supporting both one-click JSON and CSV formats with PDPA/IRB identity-map separation.
+- Verified test suite [`src/lib/teacher-pilot.test.ts`](file:///c:/Users/woram/OneDrive/Desktop/Hatairat/learn%20os/src/lib/teacher-pilot.test.ts) covering rubric scoring, roster aggregation, and CSV formatting.
+
+Verification results:
+- `npm run typecheck` → PASSED (0 errors).
+- `npm test` → PASSED (11 test files / 32 tests passed).
+- `npm run build` → PASSED (22 static/dynamic routes compiled).
+

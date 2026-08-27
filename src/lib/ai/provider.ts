@@ -11,7 +11,24 @@ export interface ProviderOptions {
   responseFormat?: "json" | "text";
 }
 
+export interface LlmTelemetry {
+  provider: LlmProviderName;
+  model: string;
+  latencyMs: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  tokensPerSecond?: number;
+  timestamp: string;
+}
+
+export interface CompletionResult {
+  content: string;
+  telemetry: LlmTelemetry;
+}
+
 export interface LlmProvider {
   name: LlmProviderName;
   complete(messages: ChatMessage[], options?: ProviderOptions): Promise<string>;
+  completeWithTelemetry?(messages: ChatMessage[], options?: ProviderOptions): Promise<CompletionResult>;
 }

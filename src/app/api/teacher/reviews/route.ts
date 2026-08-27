@@ -1,18 +1,16 @@
-import { getActivity } from "@/data/course/ecosystem/activities";
-import { DEMO_SCOPE, createDemoTeacherContext } from "@/lib/context/learning-context";
-import { teacherReviewInputSchema, recordTeacherReview } from "@/lib/education/teacher-review";
-import { listLearningEvents } from "@/lib/events/timeline";
-import type { AuthorshipIndicators } from "@/lib/domain/types";
-import { listAiInteractions, listPeerReviews, listRevisions, listSubmissions, listTeacherReviews, getSubmission } from "@/lib/repository/memory-repository";
+import { authErrorResponse, resolveLearningIdentity } from "@/lib/auth/supabase-identity";
+import { teacherReviewInputSchema, recordTeacherReviewWithRepository } from "@/lib/education/teacher-review";
+import type { AuthorshipIndicators, LearningEvent } from "@/lib/domain/types";
+import { getLearningRepository } from "@/lib/repository/index";
 import type { TeacherReviewSnapshot } from "@/lib/teacher/review-types";
 
-function snapshot(): TeacherReviewSnapshot {
-  const submissions = listSubmissions(DEMO_SCOPE.studentId);
-  const revisions = submissions.flatMap((submission) => listRevisions(submission.id));
-  const interactions = listAiInteractions(DEMO_SCOPE.studentId);
-  const peerReviews = submissions.flatMap((submission) => listPeerReviews(submission.id));
-  const reviews = submissions.flatMap((submission) => listTeacherReviews(submission.id));
-  const events = listLearningEvents(DEMO_SCOPE.studentId);
+async function snapshot(repository: Awaited<ReturnType<typeof getLearningRepository>>): Promise<TeacherReviewSnapshot> {
+  const submissions = await repository.listSubmissions();
+  const revisions = (await Promise.all(submissions.map((submission) => repository.listRevisions(submission.id)))).flat();
+  const interactions = (await Promise.all(submissions.map((submission) => repository.listInteractions(submission.studentId, submission.activityId)))).flat();
+  const peerReviews = (await Promise.all(submissions.map((submission) => repository.listPeerReviews(submission.id)))).flat();
+  const reviews = (await Promise.all(submissions.map((submission) => repository.listTeacherReviews(submission.id)))).flat();
+  const events = await repository.listLearningEvents();
   const authorshipBySubmission: Record<string, AuthorshipIndicators | undefined> = {};
   for (const event of events) {
     if (event.eventType !== "authorship_indicator_created") continue;
@@ -27,7 +25,7 @@ function snapshot(): TeacherReviewSnapshot {
     interactions,
     peerReviews,
     reviews,
-    events,
+    events: events as LearningEvent[],
     authorshipBySubmission,
     analytics: {
       submissionCount: submissions.length,
@@ -40,23 +38,44 @@ function snapshot(): TeacherReviewSnapshot {
   };
 }
 
-export function GET() {
-  return Response.json(snapshot());
+export async function GET(request: Request) {
+  try {
+    const identity = await resolveLearningIdentity({ requiredRole: "teacher" });
+    const repository = await getLearningRepository(identity);
+    return Response.json(await snapshot(repository), {
+      headers: {
+        "Cache-Control": "no-store, private",
+      },
+    });
+  } catch (error) {
+    return authErrorResponse(error);
+  }
 }
 
 export async function POST(request: Request) {
   const parsed = teacherReviewInputSchema.safeParse(await request.json());
   if (!parsed.success) return Response.json({ error: "ข้อมูล teacher review ไม่ถูกต้อง", details: parsed.error.flatten() }, { status: 400 });
-  const submission = getSubmission(parsed.data.submissionId);
-  if (!submission) return Response.json({ error: "ไม่พบ submission" }, { status: 404 });
-  const activity = getActivity(submission.activityId);
-  if (!activity) return Response.json({ error: "ไม่พบ activity" }, { status: 404 });
-  if (parsed.data.teacherId !== DEMO_SCOPE.teacherId) return Response.json({ error: "ไม่อนุญาตให้ครูคนอื่น review" }, { status: 403 });
-
   try {
-    const review = recordTeacherReview(createDemoTeacherContext(activity.id), parsed.data);
-    return Response.json({ review, snapshot: snapshot() });
+    const identity = await resolveLearningIdentity({ requiredRole: "teacher" });
+    const repository = await getLearningRepository(identity);
+    const submission = await repository.getSubmission(parsed.data.submissionId);
+    if (!submission) return Response.json({ error: "ไม่พบ submission ใน class scope ของครู" }, { status: 404 });
+    const activity = await repository.getActivity(submission.activityId);
+    if (!activity) return Response.json({ error: "ไม่พบ activity" }, { status: 404 });
+    const review = await recordTeacherReviewWithRepository(identity.context, {
+      ...parsed.data,
+      teacherId: identity.context.teacherId ?? "",
+    }, repository);
+    return Response.json({ review, snapshot: await snapshot(repository) }, {
+      headers: {
+        "Cache-Control": "no-store, private",
+      },
+    });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "บันทึก review ไม่สำเร็จ" }, { status: 409 });
+    if (error instanceof Error && /scope|scoped teacher|not found/i.test(error.message)) {
+      return Response.json({ error: error.message }, { status: 403 });
+    }
+    return authErrorResponse(error);
   }
 }
+

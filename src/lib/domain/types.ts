@@ -177,6 +177,7 @@ export interface Submission {
   responseTimeSeconds: number;
   workflowState: AdiWorkflowState;
   previousDraftId?: string;
+  idempotencyKey?: string;
 }
 
 export interface Revision {
@@ -187,6 +188,7 @@ export interface Revision {
   version: number;
   content: CerResponse;
   createdAt: string;
+  idempotencyKey?: string;
 }
 
 export interface AiSession {
@@ -219,12 +221,19 @@ export interface PeerReview {
   createdAt: string;
 }
 
+export interface TeacherReviewRubricScores {
+  claim?: number;
+  evidence?: number;
+  reasoning?: number;
+}
+
 export interface TeacherReview {
   id: string;
   submissionId: string;
   teacherId: string;
   score: number;
   comment: string;
+  rubricScores?: TeacherReviewRubricScores;
   createdAt: string;
 }
 
@@ -259,6 +268,7 @@ export interface CoachResponse {
   directAnswerBlocked: true;
   fallbackUsed: boolean;
   safetyFlags: string[];
+  telemetry?: import("@/lib/ai/provider").LlmTelemetry;
 }
 
 export type CoachFeedback = CoachResponse;
@@ -294,6 +304,7 @@ export interface LearningEvent {
   correlationId: string;
   occurredAt: string;
   createdAt: string;
+  idempotencyKey?: string;
 }
 
 export interface AnalyzeSubmissionInput {
@@ -305,3 +316,27 @@ export interface AnalyzeSubmissionInput {
   requestId?: string;
   context?: LearningContext;
 }
+
+export interface RosterStudentProgress {
+  studentId: string;
+  studentName: string;
+  activityId: string;
+  currentPhase: AdiPhase;
+  workflowState: AdiWorkflowState;
+  submissionCount: number;
+  revisionCount: number;
+  hintCount: number;
+  peerReviewCompleted: boolean;
+  teacherScore?: number;
+  lastActiveAt: string;
+}
+
+export interface ClassRosterSummary {
+  classId: string;
+  className: string;
+  courseTitle: string;
+  totalStudents: number;
+  activeActivityId: string;
+  students: RosterStudentProgress[];
+}
+

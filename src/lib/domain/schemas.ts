@@ -88,14 +88,15 @@ export const peerReviewEvaluationSchema = z.object({
 });
 
 export const peerReviewInputSchema = z.object({
-  studentId: z.string().min(1),
+  studentId: z.string().min(1).optional(),
+  reviewerStudentId: z.string().min(1).optional(),
   activityId: z.string().min(1),
   submissionId: z.string().min(1),
   authorStudentId: z.string().optional(),
   peerReviewSubmissionId: z.string().optional(),
-  scores: peerReviewScoresSchema,
-  strengths: z.string().min(1).max(4000),
-  suggestions: z.string().min(1).max(4000),
+  scores: peerReviewScoresSchema.default({ claim: 3, evidence: 3, reasoning: 3 }),
+  strengths: z.string().max(4000).default(""),
+  suggestions: z.string().max(4000).default(""),
   feedback: z.string().max(8000).optional(),
 });
 
@@ -191,6 +192,18 @@ export const coachResponseSchema = z.object({
   directAnswerBlocked: z.literal(true),
   fallbackUsed: z.boolean(),
   safetyFlags: z.array(z.string().max(128)).max(32),
+  telemetry: z
+    .object({
+      provider: z.enum(["mock", "local", "deepseek", "fallback"]),
+      model: z.string(),
+      latencyMs: z.number(),
+      promptTokens: z.number().optional(),
+      completionTokens: z.number().optional(),
+      totalTokens: z.number().optional(),
+      tokensPerSecond: z.number().optional(),
+      timestamp: z.string(),
+    })
+    .optional(),
 });
 
 export const learningEventSchema = z.object({
@@ -221,6 +234,7 @@ export const learningEventSchema = z.object({
   correlationId: z.string().min(1),
   occurredAt: z.string().datetime(),
   createdAt: z.string().datetime(),
+  idempotencyKey: z.string().min(1).max(256).optional(),
 });
 
 export function parseLearningContext(value: unknown): LearningContext {
@@ -258,4 +272,3 @@ export function parseStudentReflectionData(value: unknown): StudentReflectionDat
 export function parseAdiWizardState(value: unknown): AdiWizardState {
   return adiWizardStateSchema.parse(value);
 }
-

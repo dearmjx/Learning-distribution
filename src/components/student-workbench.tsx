@@ -11,6 +11,7 @@ import { Phase4Argumentation } from "@/components/phases/phase4-argumentation";
 import { Phase5PeerReview } from "@/components/phases/phase5-peer-review";
 import { Phase6Revision } from "@/components/phases/phase6-revision";
 import { Phase7Reflection } from "@/components/phases/phase7-reflection";
+import { DiagnosticTerminalDrawer } from "@/components/diagnostic-terminal-drawer";
 
 const emptyCer: CerResponse = { claim: "", evidence: "", reasoning: "" };
 
@@ -21,6 +22,7 @@ interface StudentWorkbenchProps {
 export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = {}) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activityId, setActivityId] = useState("");
+  const [studentId, setStudentId] = useState("demo-student-01");
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([1]);
 
@@ -30,6 +32,26 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
   const [cerResult, setCerResult] = useState<{ submission: Submission; feedback: CoachFeedback } | null>(null);
   const [, setRevisedSubmission] = useState<Submission | null>(null);
   const [error, setError] = useState("");
+
+  // Load saved student ID from localStorage if available
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("learning_os_student_id");
+      if (saved) setStudentId(saved);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  function handleStudentIdChange(val: string) {
+    const cleaned = val.trim() || "demo-student-01";
+    setStudentId(val);
+    try {
+      localStorage.setItem("learning_os_student_id", cleaned);
+    } catch {
+      // ignore
+    }
+  }
 
   useEffect(() => {
     void fetch("/api/activities")
@@ -55,6 +77,19 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function handleReset() {
+    if (window.confirm("คุณต้องการรีเซ็ตและเริ่มต้นทำกิจกรรมตั้งแต่ขั้นตอนที่ 1 หรือไม่?")) {
+      setCurrentStep(1);
+      setCompletedSteps([1]);
+      setVariablesData({});
+      setCer(emptyCer);
+      setCerResult(null);
+      setRevisedSubmission(null);
+      setError("");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
   return (
     <main className="shell">
       {/* Modern Top Header */}
@@ -71,13 +106,33 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
         </div>
 
         <div className="hero-actions">
+          {/* Student ID / Number Input */}
+          <div className="student-id-selector-box">
+            <label htmlFor="student-id-input">🧑‍🎓 เลขที่ / รหัสนักเรียน:</label>
+            <input
+              id="student-id-input"
+              type="text"
+              className="student-id-input"
+              value={studentId}
+              onChange={(e) => handleStudentIdChange(e.target.value)}
+              placeholder="เช่น demo-student-01 หรือ 15"
+              title="ระบุเลขที่หรือรหัสประจำตัวนักเรียนของคุณ"
+            />
+          </div>
+
           <div className="activity-selector-box">
             <label htmlFor="activity-select">เลือกกิจกรรม:</label>
             <select
               id="activity-select"
               className="activity-dropdown"
               value={activityId}
-              onChange={(e) => setActivityId(e.target.value)}
+              onChange={(e) => {
+                setActivityId(e.target.value);
+                setCurrentStep(1);
+                setCompletedSteps([1]);
+                setCer(emptyCer);
+                setCerResult(null);
+              }}
             >
               {activities.map((act) => (
                 <option key={act.id} value={act.id}>
@@ -88,7 +143,16 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
           </div>
 
           <div className="header-nav-links">
-            <Link className="pill-link" href="/student/timeline">
+            <button
+              type="button"
+              className="pill-link"
+              style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1", cursor: "pointer" }}
+              onClick={handleReset}
+              title="รีเซ็ตขั้นตอนกลับไปจุดเริ่มต้น"
+            >
+              🔄 เริ่มใหม่
+            </button>
+            <Link className="pill-link" href={`/student/timeline?studentId=${encodeURIComponent(studentId)}`}>
               📜 Timeline ของฉัน
             </Link>
             <Link className="pill-link" href="/teacher/review">
@@ -104,6 +168,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
         <p>
           เรียนรู้ผ่าน 7 ขั้นตอน: ปรากฏการณ์ ➔ ตัวแปร ➔ ข้อมูลสืบเสาะ ➔ ร่าง CER ➔ ประเมินเพื่อน ➔ ปรับปรุงข้อโต้แย้ง ➔ สะท้อนคิด
         </p>
+        <span className="active-student-tag">ผู้เรียนปัจจุบัน: <strong>{studentId}</strong></span>
       </div>
 
       {/* 7-Phase Stepper */}
@@ -146,6 +211,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
           {currentStep === 4 && (
             <Phase4Argumentation
               activity={activity}
+              studentId={studentId}
               cer={cer}
               onChangeCer={setCer}
               existingResult={cerResult}
@@ -160,6 +226,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
           {currentStep === 5 && (
             <Phase5PeerReview
               activity={activity}
+              studentId={studentId}
               onNext={() => advanceToStep(6)}
               onBack={() => handleSelectStep(4)}
             />
@@ -168,6 +235,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
           {currentStep === 6 && (
             <Phase6Revision
               activity={activity}
+              studentId={studentId}
               initialCer={cer}
               initialFeedback={cerResult?.feedback}
               onNext={(rev) => {
@@ -181,6 +249,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
           {currentStep === 7 && (
             <Phase7Reflection
               activity={activity}
+              studentId={studentId}
               onBack={() => handleSelectStep(6)}
             />
           )}
@@ -190,8 +259,11 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
       {/* Footer */}
       <footer className="footer-bar">
         <span>🌱 Learning OS Ecosystem · ม.4 ชีววิทยา · One-group pre/post research prototype</span>
-        <span>Version 2.0 · 7-Phase ADI & Socratic Coach Engine</span>
+        <span>Version 2.1 · 7-Phase ADI & LM Studio Telemetry Engine</span>
       </footer>
+
+      {/* LM Studio Style Live Diagnostic Drawer */}
+      <DiagnosticTerminalDrawer />
     </main>
   );
 }

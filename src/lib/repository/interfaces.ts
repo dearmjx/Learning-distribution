@@ -32,6 +32,7 @@ export interface SubmissionRepository {
   getSubmission(submissionId: string): Submission | undefined;
   listSubmissions(studentId?: string, activityId?: string): Submission[];
   latestSubmission(studentId: string, activityId: string): Submission | undefined;
+  updateSubmissionWorkflow(submissionId: string, workflowState: Submission["workflowState"]): Submission | undefined;
 }
 
 export interface RevisionRepository {
@@ -70,3 +71,28 @@ export interface LearningEventRepository {
   list(studentId?: string, activityId?: string): LearningEvent[];
 }
 
+/** Async, request-scoped port used by API routes. */
+export interface ScopedLearningRepository {
+  getActivity(activityId: string): Promise<Activity | undefined>;
+  listActivities(courseId: string): Promise<Activity[]>;
+  addSubmission(input: Omit<Submission, "id" | "submittedAt">): Promise<Submission>;
+  getSubmission(submissionId: string): Promise<Submission | undefined>;
+  listSubmissions(studentId?: string, activityId?: string): Promise<Submission[]>;
+  latestSubmission(studentId: string, activityId: string): Promise<Submission | undefined>;
+  updateSubmissionWorkflow(submissionId: string, workflowState: Submission["workflowState"]): Promise<Submission | undefined>;
+  addRevision(input: Omit<Revision, "id" | "createdAt">): Promise<Revision>;
+  listRevisions(submissionId: string): Promise<Revision[]>;
+  createSession(input: Omit<AiSession, "id" | "startedAt">): Promise<AiSession>;
+  addInteraction(input: Omit<AiInteraction, "id" | "createdAt">): Promise<AiInteraction>;
+  listInteractions(studentId: string, activityId?: string): Promise<AiInteraction[]>;
+  addPeerReview(input: Omit<PeerReview, "id" | "createdAt">): Promise<PeerReview>;
+  listPeerReviews(submissionId?: string, reviewerStudentId?: string): Promise<PeerReview[]>;
+  getAssignedPeerReviewDraft(studentId: string, activityId: string): Promise<PeerReviewSubmission | undefined>;
+  addReflection(input: Omit<StudentReflectionData, "id" | "completedAt">): Promise<StudentReflectionData>;
+  getReflection(studentId: string, activityId: string): Promise<StudentReflectionData | undefined>;
+  listReflections(studentId?: string, activityId?: string): Promise<StudentReflectionData[]>;
+  addTeacherReview(input: Omit<TeacherReview, "id" | "createdAt">): Promise<TeacherReview>;
+  listTeacherReviews(submissionId?: string): Promise<TeacherReview[]>;
+  appendLearningEvent(event: LearningEvent): Promise<LearningEvent>;
+  listLearningEvents(studentId?: string, activityId?: string): Promise<LearningEvent[]>;
+}

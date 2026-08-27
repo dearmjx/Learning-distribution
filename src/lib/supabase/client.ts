@@ -1,27 +1,26 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/types";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+let browserClient: ReturnType<typeof createClient<Database>> | null = null;
 
-let clientInstance: SupabaseClient | null = null;
+export function getSupabaseBrowserClient() {
+  if (browserClient) return browserClient;
 
-export function getSupabaseClient(): SupabaseClient | null {
-  if (!supabaseUrl || !supabaseKey) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
     return null;
   }
 
-  if (!clientInstance) {
-    clientInstance = createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    });
-  }
+  browserClient = createClient<Database>(url, anonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
 
-  return clientInstance;
+  return browserClient;
 }
 
-export const supabase = getSupabaseClient();
+export const getSupabaseClient = getSupabaseBrowserClient;

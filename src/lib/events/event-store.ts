@@ -2,6 +2,7 @@ import { parseLearningEvent } from "@/lib/domain/schemas";
 import type { LearningEvent, LearningEventType } from "@/lib/domain/types";
 
 export type LearningEventInput = Omit<LearningEvent, "id" | "occurredAt" | "createdAt"> & {
+  id?: string;
   occurredAt?: string;
 };
 
@@ -15,6 +16,16 @@ export interface LearningEventFilters {
 
 export type LearningEventHandler = (event: LearningEvent) => void | Promise<void>;
 
+export function createLearningEvent(input: LearningEventInput): LearningEvent {
+  const occurredAt = input.occurredAt ?? new Date().toISOString();
+  return parseLearningEvent({
+    ...input,
+    id: input.id ?? crypto.randomUUID(),
+    occurredAt,
+    createdAt: occurredAt,
+  });
+}
+
 /**
  * Education-owned append-only event store. It follows the source platform's
  * event-store pattern but has no industrial context, table, or data coupling.
@@ -24,13 +35,17 @@ export class LearningEventStore {
   private readonly subscribers = new Map<string, Set<LearningEventHandler>>();
 
   append(input: LearningEventInput): LearningEvent {
-    const occurredAt = input.occurredAt ?? new Date().toISOString();
-    const event = parseLearningEvent({
-      ...input,
-      id: crypto.randomUUID(),
-      occurredAt,
-      createdAt: occurredAt,
-    });
+    if (input.idempotencyKey) {
+      const existing = this.events.find(
+        (event) =>
+          event.idempotencyKey === input.idempotencyKey &&
+          event.studentId === input.studentId &&
+          event.activityId === input.activityId,
+      );
+      if (existing) return existing;
+    }
+
+    const event = createLearningEvent(input);
     this.events.push(event);
     this.notify(event);
     return event;

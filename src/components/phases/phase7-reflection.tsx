@@ -6,6 +6,7 @@ import type { Activity } from "@/lib/domain/types";
 
 interface Phase7Props {
   activity: Activity;
+  studentId?: string;
   onBack: () => void;
 }
 
@@ -17,7 +18,7 @@ const CONCEPTS_CHECKLIST = [
   "การใช้ AI แบบถามนำ (Socratic) โดยไม่ลอกคำตอบตรงๆ",
 ];
 
-export function Phase7Reflection({ activity, onBack }: Phase7Props) {
+export function Phase7Reflection({ activity, studentId = "demo-student-01", onBack }: Phase7Props) {
   const [analyticalScore, setAnalyticalScore] = useState(4);
   const [aiLiteracyScore, setAiLiteracyScore] = useState(5);
   const [confidence, setConfidence] = useState<"low" | "medium" | "high">("high");
@@ -46,7 +47,7 @@ export function Phase7Reflection({ activity, onBack }: Phase7Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId: "demo-student-01",
+          studentId,
           activityId: activity.id,
           analyticalThinkingScore: analyticalScore,
           aiLiteracyScore: aiLiteracyScore,

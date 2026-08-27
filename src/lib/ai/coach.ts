@@ -127,14 +127,27 @@ export async function generateCoachFeedback(
   let raw: string;
   let fallbackUsed = false;
   let providerName: CoachResponse["provider"] = provider.name;
+  let telemetry: import("@/lib/ai/provider").LlmTelemetry | undefined;
 
   try {
-    raw = await provider.complete(buildMessages(request), { responseFormat: "json", maxTokens: 600 });
+    if (provider.completeWithTelemetry) {
+      const res = await provider.completeWithTelemetry(buildMessages(request), { responseFormat: "json", maxTokens: 600 });
+      raw = res.content;
+      telemetry = res.telemetry;
+    } else {
+      raw = await provider.complete(buildMessages(request), { responseFormat: "json", maxTokens: 600 });
+    }
   } catch {
     fallbackUsed = true;
     providerName = "fallback";
     try {
-      raw = await fallbackProvider.complete(buildMessages(request), { responseFormat: "json", maxTokens: 600 });
+      if (fallbackProvider.completeWithTelemetry) {
+        const res = await fallbackProvider.completeWithTelemetry(buildMessages(request), { responseFormat: "json", maxTokens: 600 });
+        raw = res.content;
+        telemetry = res.telemetry;
+      } else {
+        raw = await fallbackProvider.complete(buildMessages(request), { responseFormat: "json", maxTokens: 600 });
+      }
     } catch {
       return fallbackCoachResponse(request, "provider_and_fallback_failed");
     }
@@ -150,6 +163,7 @@ export async function generateCoachFeedback(
     directAnswerBlocked: true,
     fallbackUsed,
     safetyFlags: ["no_direct_answer", "approved_context_only", "teacher_final_grader"],
+    telemetry,
   });
   return educationSafetyPolicy.enforceCoachResponse(request, candidate);
 }
@@ -173,6 +187,7 @@ export interface CoachChatResult {
   citations: string[];
   fallbackUsed: boolean;
   safetyFlags: string[];
+  telemetry?: import("@/lib/ai/provider").LlmTelemetry;
 }
 
 export async function chatWithCoach(
@@ -209,14 +224,27 @@ export async function chatWithCoach(
   let reply = "";
   let providerName = provider.name;
   let fallbackUsed = false;
+  let telemetry: import("@/lib/ai/provider").LlmTelemetry | undefined;
 
   try {
-    reply = await provider.complete(messages, { maxTokens: 400 });
+    if (provider.completeWithTelemetry) {
+      const res = await provider.completeWithTelemetry(messages, { maxTokens: 400 });
+      reply = res.content;
+      telemetry = res.telemetry;
+    } else {
+      reply = await provider.complete(messages, { maxTokens: 400 });
+    }
   } catch {
     fallbackUsed = true;
     providerName = "fallback";
     try {
-      reply = await fallbackProvider.complete(messages, { maxTokens: 400 });
+      if (fallbackProvider.completeWithTelemetry) {
+        const res = await fallbackProvider.completeWithTelemetry(messages, { maxTokens: 400 });
+        reply = res.content;
+        telemetry = res.telemetry;
+      } else {
+        reply = await fallbackProvider.complete(messages, { maxTokens: 400 });
+      }
     } catch {
       reply = "ลองพิจารณาดูว่าข้อมูลในโจทย์หรือบทเรียนระบุถึงสิ่งนี้อย่างไรบ้างครับ?";
     }
@@ -234,6 +262,7 @@ export async function chatWithCoach(
     citations: [input.activity.title, "บริบทกิจกรรมที่ครูอนุมัติ"],
     fallbackUsed,
     safetyFlags: ["socratic_deep_dive", "no_direct_answer", "approved_context_only"],
+    telemetry,
   };
 }
 

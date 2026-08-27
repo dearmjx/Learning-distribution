@@ -3,9 +3,12 @@
 import { useState } from "react";
 import type { Activity, CerResponse, CoachFeedback, HintDepth, Submission } from "@/lib/domain/types";
 import { SocraticCoachChat } from "@/components/socratic-coach-chat";
+import { AiEvaluatingIndicator } from "@/components/ai-evaluating-indicator";
+import { diagnosticLogger } from "@/lib/telemetry-logger";
 
 interface Phase4Props {
   activity: Activity;
+  studentId?: string;
   cer: CerResponse;
   onChangeCer: (newCer: CerResponse) => void;
   onNext: (submission: Submission, feedback: CoachFeedback) => void;
@@ -15,6 +18,7 @@ interface Phase4Props {
 
 export function Phase4Argumentation({
   activity,
+  studentId = "demo-student-01",
   cer,
   onChangeCer,
   onNext,
@@ -39,12 +43,27 @@ export function Phase4Argumentation({
     setLoading(true);
     setError("");
 
+    const startTime = performance.now();
+    diagnosticLogger.log({
+      level: "info",
+      category: "API",
+      message: `[Phase 4] Sending CER submission for student '${studentId}' (activity: ${activity.id})`,
+      details: {
+        hintDepth,
+        cerLength: {
+          claim: cer.claim.length,
+          evidence: cer.evidence.length,
+          reasoning: cer.reasoning.length,
+        },
+      },
+    });
+
     try {
       const response = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId: "demo-student-01",
+          studentId,
           activityId: activity.id,
           content: cer,
           hintDepth,
@@ -52,13 +71,39 @@ export function Phase4Argumentation({
         }),
       });
 
+      const elapsedMs = Math.round(performance.now() - startTime);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "ไม่สามารถส่งข้อโต้แย้งได้");
+
+      if (!response.ok) {
+        const errMsg = data.error ?? "ไม่สามารถส่งข้อโต้แย้งได้";
+        diagnosticLogger.log({
+          level: "error",
+          category: "API",
+          message: `[Phase 4] /api/sessions returned status ${response.status}: ${errMsg}`,
+          details: data,
+        });
+        throw new Error(errMsg);
+      }
+
+      const feedback = data.feedback as CoachFeedback;
+      diagnosticLogger.log({
+        level: "success",
+        category: "LLM",
+        message: `[Phase 4] AI Coach evaluated CER in ${elapsedMs}ms (${feedback.provider})`,
+        telemetry: feedback.telemetry,
+        details: {
+          targetDimension: feedback.targetDimension,
+          citations: feedback.citations,
+          directAnswerBlocked: feedback.directAnswerBlocked,
+          safetyFlags: feedback.safetyFlags,
+        },
+      });
 
       setResult(data);
       if (hintDepth === "deep") setShowChat(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการวิเคราะห์");
+      const msg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการวิเคราะห์";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -102,8 +147,8 @@ export function Phase4Argumentation({
 
           <div className="form-group">
             <label className="form-label" htmlFor="cer-evidence">
-              <strong>2. Evidence (ข้อมูลเชิงประจักษ์/ตัวเลขจาก Phase 3)</strong>
-              <small>อ้างอิงข้อมูลตัวเลขหรือการเปลี่ยนแปลงจากตารางสืบเสาะ</small>
+              <strong>2. Evidence (หลักฐานเชิงประจักษ์จาก Phase 3)</strong>
+              <small>ยกตัวเลข ค่าสังเกต หรือตารางข้อมูลที่บันทึกไว้</small>
             </label>
             <textarea
               id="cer-evidence"
@@ -111,14 +156,14 @@ export function Phase4Argumentation({
               rows={3}
               value={cer.evidence}
               onChange={(e) => onChangeCer({ ...cer, evidence: e.target.value })}
-              placeholder="ตัวอย่าง: จากข้อมูลสืบเสาะ เมื่อประชากรงูลดจาก 80 เหลือ 5 ตัว พบว่าหนูนาเพิ่มจาก 300 เป็น 1,250 ตัว (+317%) และหญ้าลดลงจาก 50,000 เหลือ 22,000 ต้น (-56%)..."
+              placeholder="ตัวอย่าง: จากตารางการสืบเสาะ เมื่อประชากรงูลดลงจาก 100 เหลือ 10 ตัว พบว่าจำนวนหนูเพิ่มขึ้นจาก 50 เป็น 280 ตัวใน 3 เดือน..."
             />
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="cer-reasoning">
-              <strong>3. Reasoning (คำอธิบายเชิงกลไก & กฎ 10%)</strong>
-              <small>อธิบายว่าทำไมหลักฐานถึงสนับสนุนข้อสรุปโดยใช้ทฤษฎีทางชีววิทยา</small>
+              <strong>3. Reasoning (หลักการและเหตุผลทางวิทยาศาสตร์)</strong>
+              <small>อธิบายกลไกโดยเชื่อมโยงกับกฎการถ่ายทอดพลังงาน 10% หรือสายใยอาหาร</small>
             </label>
             <textarea
               id="cer-reasoning"
@@ -126,7 +171,7 @@ export function Phase4Argumentation({
               rows={3}
               value={cer.reasoning}
               onChange={(e) => onChangeCer({ ...cer, reasoning: e.target.value })}
-              placeholder="ตัวอย่าง: เนื่องจากงูเป็นผู้บริโภคอันดับสุดท้ายที่ควบคุมประชากรหนู เมื่อผู้ล่าลดลงทำให้หนูขยายพันธุ์เร็วและกินหญ้ามากขึ้น และตามกฎ 10% การถ่ายทอดพลังงาน..."
+              placeholder="ตัวอย่าง: เพราะงูเป็นผู้บริโภคลำดับที่ 2 ที่คอยควบคุมประชากรหนู และตามกฎ 10% พลังงานจะสูญเสียเป็นความร้อนถึง 90%..."
             />
           </div>
 
@@ -151,15 +196,21 @@ export function Phase4Argumentation({
             onClick={() => void submitCer()}
             disabled={loading}
           >
-            {loading ? "กำลังให้ AI Coach วิเคราะห์…" : "ส่งข้อโต้แย้งและรับ Feedback จาก AI Coach"}
+            {loading ? "🧑‍🏫 อาจารย์ AI กำลังตรวจและคิดคำถาม Socratic…" : "ส่งข้อโต้แย้งและรับ Feedback จาก AI Coach"}
           </button>
 
           {error && <p className="error-text">{error}</p>}
         </div>
 
-        {/* Right Col: AI Feedback & Mini-Chat */}
+        {/* Right Col: AI Feedback, Evaluating Animation or Guide */}
         <div className="right-panel">
-          {result ? (
+          {loading ? (
+            <AiEvaluatingIndicator
+              title="อาจารย์ AI กำลังตรวจและคิดคำถาม Socratic..."
+              subtitle="กำลังประมวลผลผ่าน Local Ollama Engine (โปรดรอสักครู่ ระบบกำลังทำงาน ไม่ได้ค้าง)"
+              modelName="ornith:9b"
+            />
+          ) : result ? (
             <div className="feedback-wrapper">
               <div className="card feedback-card">
                 <div className="card-heading">
@@ -172,12 +223,19 @@ export function Phase4Argumentation({
                 <blockquote>{result.feedback.message}</blockquote>
                 <div className="citation">อ้างอิง: {result.feedback.citations.join(" · ")}</div>
                 <p className="guardrail-note">✓ Direct answer ถูกบล็อก · AI Coach ตั้งคำถามนำเพื่อฝึกคิดวิเคราะห์</p>
+
+                {result.feedback.telemetry && (
+                  <div className="feedback-telemetry-pill">
+                    ⚡ {result.feedback.telemetry.tokensPerSecond ?? 0} t/s | ⏱️ {(result.feedback.telemetry.latencyMs / 1000).toFixed(1)}s ({result.feedback.telemetry.model})
+                  </div>
+                )}
               </div>
 
               {hintDepth === "deep" || showChat ? (
                 <SocraticCoachChat
                   activityId={activity.id}
                   activity={activity}
+                  studentId={studentId}
                   studentCer={cer}
                   initialCoachFeedback={result.feedback.message}
                 />
@@ -219,16 +277,18 @@ export function Phase4Argumentation({
         <button type="button" className="secondary-button" onClick={onBack}>
           ← กลับไปดูข้อมูลสืบเสาะ (Phase 3)
         </button>
+
         <button
           type="button"
-          className="primary-button next-phase-btn"
+          className="primary-button"
+          disabled={!result || loading}
           onClick={() => {
-            if (result) onNext(result.submission, result.feedback);
-            else void submitCer();
+            if (result) {
+              onNext(result.submission, result.feedback);
+            }
           }}
-          disabled={!cer.claim.trim() || !cer.evidence.trim()}
         >
-          {result ? "ไปประเมินข้อโต้แย้งของเพื่อน ➔ (Phase 5)" : "ส่ง CER และไปต่อ Phase 5 ➔"}
+          ไปยังการประเมินเพื่อน (Phase 5) →
         </button>
       </div>
     </div>

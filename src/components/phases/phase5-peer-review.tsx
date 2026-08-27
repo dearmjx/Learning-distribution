@@ -5,11 +5,12 @@ import type { Activity, PeerReviewSubmission } from "@/lib/domain/types";
 
 interface Phase5Props {
   activity: Activity;
+  studentId?: string;
   onNext: () => void;
   onBack: () => void;
 }
 
-export function Phase5PeerReview({ activity, onNext, onBack }: Phase5Props) {
+export function Phase5PeerReview({ activity, studentId = "demo-student-01", onNext, onBack }: Phase5Props) {
   const [peerDraft, setPeerDraft] = useState<PeerReviewSubmission | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -25,7 +26,7 @@ export function Phase5PeerReview({ activity, onNext, onBack }: Phase5Props) {
   const [feedbackText, setFeedbackText] = useState("");
 
   useEffect(() => {
-    void fetch(`/api/peer-reviews?activityId=${activity.id}&studentId=demo-student-01`)
+    void fetch(`/api/peer-reviews?activityId=${activity.id}&studentId=${encodeURIComponent(studentId)}`)
       .then((res) => res.json())
       .then((data: { assignedDraft?: PeerReviewSubmission; error?: string }) => {
         if (data.assignedDraft) {
@@ -39,19 +40,19 @@ export function Phase5PeerReview({ activity, onNext, onBack }: Phase5Props) {
             activityId: activity.id,
             anonymousAuthorAlias: "นักเรียนนิรนาม A-14",
             content: {
-              claim: "ถ้าไม่มีงู หนูนาจะเพิ่มขึ้น และพลังงานในระบบจะหมุนเวียนกลับมาให้พืชใช้ใหม่",
-              evidence: "จากตาราง หนูเพิ่มขึ้นจาก 300 เป็น 1250 ตัว",
-              reasoning: "เพราะงูไม่กินหนูแล้ว และพลังงานถูกถ่ายทอดกลับไปเป็นปุ๋ยให้พืชโตขึ้น",
+              claim: "ถ้าประชากรงูลดลง จำนวนหนูนาจะเพิ่มขึ้น และพลังงานในระบบนิเวศจะหมุนเวียนกลับมาเป็น 100% เท่าเดิม",
+              evidence: "จากข้อมูลพบว่าเมื่อไม่มีงู หนูนาจะไม่มีผู้ล่า จำนวนประชากรหนูจึงเพิ่มขึ้นจากเดิม 2 เท่า",
+              reasoning: "เนื่องจากพลังงานสามารถหมุนเวียนถ่ายทอดกลับไปมาระหว่างสิ่งมีชีวิตได้เรื่อยๆ โดยไม่มีการสูญหาย",
             },
             submittedAt: new Date().toISOString(),
             isSynthetic: true,
-            misconceptionTag: "energy_is_recycled",
+            misconceptionTag: "energy_cycling",
           });
         }
       })
       .catch(() => setError("โหลดงานของเพื่อนไม่สำเร็จ"))
       .finally(() => setLoading(false));
-  }, [activity.id]);
+  }, [activity.id, studentId]);
 
   async function submitReview() {
     if (!peerDraft) return;
@@ -67,8 +68,10 @@ export function Phase5PeerReview({ activity, onNext, onBack }: Phase5Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reviewerStudentId: "demo-student-01",
+          studentId,
+          reviewerStudentId: studentId,
           submissionId: peerDraft.submissionId,
+          peerReviewSubmissionId: peerDraft.id,
           authorStudentId: peerDraft.authorStudentId,
           activityId: activity.id,
           feedback: combinedFeedback,
@@ -77,8 +80,8 @@ export function Phase5PeerReview({ activity, onNext, onBack }: Phase5Props) {
             evidence: evidenceScore,
             reasoning: reasoningScore,
           },
-          strengths,
-          suggestions,
+          strengths: strengths || "ระบุข้อค้นพบชัดเจน",
+          suggestions: suggestions || "ควรเพิ่มรายละเอียดเรื่องกฎ 10%",
         }),
       });
 

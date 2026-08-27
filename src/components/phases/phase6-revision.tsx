@@ -5,6 +5,7 @@ import type { Activity, CerResponse, CoachFeedback, PeerReview, Submission } fro
 
 interface Phase6Props {
   activity: Activity;
+  studentId?: string;
   initialCer: CerResponse;
   initialFeedback?: CoachFeedback | null;
   onNext: (revisedSubmission: Submission) => void;
@@ -13,6 +14,7 @@ interface Phase6Props {
 
 export function Phase6Revision({
   activity,
+  studentId = "demo-student-01",
   initialCer,
   initialFeedback,
   onNext,
@@ -30,7 +32,7 @@ export function Phase6Revision({
   const [revisedSubmission, setRevisedSubmission] = useState<Submission | null>(null);
 
   useEffect(() => {
-    void fetch(`/api/peer-reviews?activityId=${activity.id}&authorId=demo-student-01`)
+    void fetch(`/api/peer-reviews?activityId=${activity.id}&authorId=${encodeURIComponent(studentId)}`)
       .then((res) => res.json())
       .then((data: { reviews?: PeerReview[] }) => {
         if (data.reviews && data.reviews.length > 0) {
@@ -42,7 +44,7 @@ export function Phase6Revision({
               id: "peer-feedback-01",
               submissionId: "demo-sub-01",
               reviewerStudentId: "peer-student-05",
-              authorStudentId: "demo-student-01",
+              authorStudentId: studentId,
               activityId: activity.id,
               feedback: "อธิบายเรื่องการเพิ่มขึ้นของหนูได้ชัดเจนมาก แต่อยากให้เพิ่มตัวเลข kcal ของพลังงานที่สูญเสียไปตามกฎ 10% ในส่วน Reasoning จะทำให้ข้อโต้แย้งน่าเชื่อถือยิ่งขึ้น",
               createdAt: new Date().toISOString(),
@@ -54,7 +56,7 @@ export function Phase6Revision({
         }
       })
       .catch(() => {});
-  }, [activity.id]);
+  }, [activity.id, studentId]);
 
   async function submitRevision() {
     setSubmitting(true);
@@ -65,7 +67,7 @@ export function Phase6Revision({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId: "demo-student-01",
+          studentId,
           activityId: activity.id,
           content: revisedCer,
           hintDepth: "none",

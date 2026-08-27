@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { getActivity } from "@/data/course/ecosystem/activities";
 import { chatWithCoach } from "@/lib/ai/coach";
-import { assertStudentScope, createDemoStudentContext } from "@/lib/context/learning-context";
-import { appendLearningEvent } from "@/lib/events/timeline";
+import { assertRequestedStudentMatchesContext, authErrorResponse, resolveLearningIdentity } from "@/lib/auth/supabase-identity";
+import { appendPersistedLearningEvent } from "@/lib/events/persistent-event";
 import { approvedContextRepository } from "@/lib/knowledge/approved-context";
+import { getLearningRepository } from "@/lib/repository/index";
 
 const chatRequestSchema = z.object({
-  studentId: z.string().min(1).default("demo-student-01"),
+  studentId: z.string().min(1).optional(),
   activityId: z.string().min(1),
   message: z.string().min(1).max(2000),
   studentCer: z
@@ -38,8 +38,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const { studentId, activityId, message, studentCer, history } = parsed.data;
-    const activity = getActivity(activityId);
+    const { studentId: requestedStudentId, activityId, message, studentCer, history } = parsed.data;
+    const identity = await resolveLearningIdentity({ activityId, requiredRole: "student" });
+    assertRequestedStudentMatchesContext(identity.context, requestedStudentId);
+    const repository = await getLearningRepository(identity);
+    const activity = await repository.getActivity(activityId);
     if (!activity) {
       return Response.json({ error: "ไม่พบกิจกรรม" }, { status: 404 });
     }
@@ -47,15 +50,11 @@ export async function POST(request: Request) {
     const approvedDoc = approvedContextRepository.getApprovedContext(activity.courseId, activity.id);
     const approvedContext = approvedDoc?.text ?? activity.context;
 
-    const context = createDemoStudentContext(activity.id);
-    try {
-      assertStudentScope(context, studentId);
-    } catch {
-      return Response.json({ error: "ไม่อนุญาตให้เข้าถึงข้อมูลนักเรียนคนอื่น" }, { status: 403 });
-    }
+    const context = identity.context;
+    const studentId = context.studentId!;
 
     // Log student chat prompt event
-    appendLearningEvent({
+    await appendPersistedLearningEvent(repository, {
       studentId,
       activityId,
       eventType: "hint_requested",
@@ -77,7 +76,7 @@ export async function POST(request: Request) {
     });
 
     // Log AI Coach reply event
-    appendLearningEvent({
+    await appendPersistedLearningEvent(repository, {
       studentId,
       activityId,
       eventType: "ai_feedback_received",
@@ -92,7 +91,7 @@ export async function POST(request: Request) {
 
     return Response.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการสนทนากับ AI Coach";
-    return Response.json({ error: message }, { status: 500 });
+    if (error instanceof Error && /scope denied|identity is controlled|Student scope required/.test(error.message)) return Response.json({ error: error.message }, { status: 403 });
+    return authErrorResponse(error);
   }
 }

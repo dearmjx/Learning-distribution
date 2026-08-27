@@ -14,6 +14,9 @@ function id(prefix: string): string {
 }
 
 export interface LearningContextInput {
+  schoolId?: string;
+  courseId?: string;
+  classId?: string;
   activityId?: string;
   studentId?: string;
   teacherId?: string;
@@ -28,9 +31,9 @@ export interface LearningContextInput {
 export function createLearningContext(input: LearningContextInput = {}): LearningContext {
   const role = input.role ?? (input.teacherId ? "teacher" : "student");
   const context: LearningContext = {
-    schoolId: DEMO_SCOPE.schoolId,
-    courseId: DEMO_SCOPE.courseId,
-    classId: DEMO_SCOPE.classId,
+    schoolId: input.schoolId ?? DEMO_SCOPE.schoolId,
+    courseId: input.courseId ?? DEMO_SCOPE.courseId,
+    classId: input.classId ?? DEMO_SCOPE.classId,
     ...(input.activityId ? { activityId: input.activityId } : {}),
     ...(input.studentId ? { studentId: input.studentId } : {}),
     ...(input.teacherId ? { teacherId: input.teacherId } : {}),
@@ -43,6 +46,28 @@ export function createLearningContext(input: LearningContextInput = {}): Learnin
   };
 
   return learningContextSchema.parse(context);
+}
+
+/**
+ * Local-only identity source. It is intentionally server configuration, not
+ * a request/body/localStorage identity. Supabase mode never uses this path.
+ */
+export function createLocalDevelopmentContext(
+  role: Extract<LearningRole, "student" | "teacher"> = "student",
+  activityId?: string,
+  correlationId?: string,
+): LearningContext {
+  const studentId = process.env.LEARNING_LOCAL_STUDENT_ID ?? DEMO_SCOPE.studentId;
+  const teacherId = process.env.LEARNING_LOCAL_TEACHER_ID ?? DEMO_SCOPE.teacherId;
+  return createLearningContext({
+    schoolId: process.env.LEARNING_LOCAL_SCHOOL_ID ?? DEMO_SCOPE.schoolId,
+    courseId: process.env.LEARNING_LOCAL_COURSE_ID ?? DEMO_SCOPE.courseId,
+    classId: process.env.LEARNING_LOCAL_CLASS_ID ?? DEMO_SCOPE.classId,
+    ...(activityId ? { activityId } : {}),
+    ...(role === "student" ? { studentId } : { teacherId }),
+    role,
+    correlationId,
+  });
 }
 
 export function createDemoStudentContext(activityId: string, correlationId?: string): LearningContext {

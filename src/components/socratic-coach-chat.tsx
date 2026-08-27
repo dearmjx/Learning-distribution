@@ -2,17 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Activity, CerResponse } from "@/lib/domain/types";
+import { diagnosticLogger } from "@/lib/telemetry-logger";
 
 export interface MessageItem {
   id: string;
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  telemetryPill?: string;
 }
 
 interface SocraticCoachChatProps {
   activityId: string;
   activity?: Activity;
+  studentId?: string;
   studentCer?: CerResponse;
   initialCoachFeedback?: string;
 }
@@ -26,12 +29,14 @@ const QUICK_PROMPTS = [
 
 export function SocraticCoachChat({
   activityId,
+  studentId = "demo-student-01",
   studentCer,
   initialCoachFeedback,
 }: SocraticCoachChatProps) {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [chatSeconds, setChatSeconds] = useState(0);
   const [error, setError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -59,6 +64,17 @@ export function SocraticCoachChat({
   }, [initialCoachFeedback]);
 
   useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (loading) {
+      setChatSeconds(0);
+      timer = setInterval(() => setChatSeconds((s) => s + 1), 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [loading]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
@@ -78,12 +94,20 @@ export function SocraticCoachChat({
     setLoading(true);
     setError("");
 
+    const startTime = performance.now();
+    diagnosticLogger.log({
+      level: "info",
+      category: "LLM",
+      message: `[Socratic Chat] Sending prompt from student '${studentId}' to AI Coach...`,
+      details: { prompt: text, historyLength: messages.length },
+    });
+
     try {
       const response = await fetch("/api/coach/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId: "demo-student-01",
+          studentId,
           activityId,
           message: text,
           studentCer,
@@ -91,19 +115,45 @@ export function SocraticCoachChat({
         }),
       });
 
+      const elapsedMs = Math.round(performance.now() - startTime);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "ไม่สามารถส่งข้อความได้");
+
+      if (!response.ok) {
+        const errMsg = data.error ?? "ไม่สามารถส่งข้อความได้";
+        diagnosticLogger.log({
+          level: "error",
+          category: "LLM",
+          message: `[Socratic Chat] API error: ${errMsg}`,
+          details: data,
+        });
+        throw new Error(errMsg);
+      }
+
+      diagnosticLogger.log({
+        level: "success",
+        category: "LLM",
+        message: `[Socratic Chat] AI Coach responded in ${elapsedMs}ms (${data.provider})`,
+        telemetry: data.telemetry,
+        details: {
+          citations: data.citations,
+          safetyFlags: data.safetyFlags,
+        },
+      });
 
       const coachMessage: MessageItem = {
         id: `coach-${Date.now()}`,
         role: "assistant",
         content: data.message,
         createdAt: new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }),
+        telemetryPill: data.telemetry
+          ? `⚡ ${data.telemetry.tokensPerSecond ?? 0} t/s · ⏱️ ${(data.telemetry.latencyMs / 1000).toFixed(1)}s`
+          : undefined,
       };
 
       setMessages((prev) => [...prev, coachMessage]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI Coach");
+      const msg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI Coach";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -127,10 +177,13 @@ export function SocraticCoachChat({
           >
             <div className={`chat-bubble ${item.role === "user" ? "chat-bubble-user" : "chat-bubble-coach"}`}>
               <div className="chat-author-tag">
-                {item.role === "user" ? "คุณ (Student)" : "🌿 AI Coach"}
+                {item.role === "user" ? `🧑‍🎓 นักเรียน (${studentId})` : "🌿 อาจารย์ AI Coach"}
                 <span className="chat-time">{item.createdAt}</span>
               </div>
               <p className="chat-text">{item.content}</p>
+              {item.telemetryPill && (
+                <div className="chat-telemetry-badge">{item.telemetryPill}</div>
+              )}
             </div>
           </div>
         ))}
@@ -138,10 +191,16 @@ export function SocraticCoachChat({
         {loading && (
           <div className="chat-bubble-row chat-coach-row">
             <div className="chat-bubble chat-bubble-coach typing-bubble">
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-              <span className="typing-text">AI Coach กำลังคิดคำถามนำ...</span>
+              <div className="chat-author-tag">
+                🌿 อาจารย์ AI Coach กำลังคิดคำถาม Socratic...
+                <span className="chat-time">⏱️ {chatSeconds} วินาที (Local Ollama)</span>
+              </div>
+              <div className="typing-dots">
+                <span className="dot dot-1" />
+                <span className="dot dot-2" />
+                <span className="dot dot-3" />
+              </div>
+              <p className="typing-reassurance">กำลังประมวลผลบนเครื่อง (ไม่ได้ค้าง)...</p>
             </div>
           </div>
         )}
@@ -151,25 +210,27 @@ export function SocraticCoachChat({
 
       {error && <p className="error-text chat-error">{error}</p>}
 
-      <div className="quick-prompts-row">
-        <span className="quick-label">ลองถาม:</span>
-        <div className="chips-scroll">
-          {QUICK_PROMPTS.map((promptText, idx) => (
+      {/* Quick Prompt Suggestions */}
+      <div className="quick-prompts-bar">
+        <span className="quick-label">💡 คำถามด่วน:</span>
+        <div className="quick-chips">
+          {QUICK_PROMPTS.map((prompt) => (
             <button
-              key={idx}
+              key={prompt}
               type="button"
-              className="chip-button"
-              onClick={() => void sendMessage(promptText)}
+              className="quick-chip"
               disabled={loading}
+              onClick={() => void sendMessage(prompt)}
             >
-              {promptText}
+              {prompt}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Input row */}
       <form
-        className="chat-input-form"
+        className="chat-input-row"
         onSubmit={(e) => {
           e.preventDefault();
           void sendMessage();
@@ -177,19 +238,20 @@ export function SocraticCoachChat({
       >
         <input
           type="text"
-          className="chat-text-input"
+          className="chat-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="พิมพ์คำถามหรือข้อสงสัยเกี่ยวกับระบบนิเวศ..."
+          placeholder="พิมพ์ข้อความถาม AI Coach (เช่น เหตุใดพลังงานจึงสูญเสียไป?)..."
           disabled={loading}
         />
-        <button type="submit" className="primary-button compact-button" disabled={loading || !input.trim()}>
-          {loading ? "..." : "ส่ง"}
+        <button
+          type="submit"
+          className="primary-button send-btn"
+          disabled={loading || !input.trim()}
+        >
+          {loading ? "กำลังส่ง…" : "ส่งข้อความ"}
         </button>
       </form>
-      <p className="small-note chat-note">
-        💡 AI Coach จะถามนำแบบ Socratic โดยไม่เฉลยคำตอบ เพื่อช่วยให้คุณค้นพบข้อสรุปด้วยตนเอง
-      </p>
     </div>
   );
 }
