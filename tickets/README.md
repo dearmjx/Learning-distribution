@@ -10,7 +10,7 @@ Lightweight file-based tracker. One file per ticket: `LOS-NNN-slug.md`.
 |---|---|---|---|---|
 | [LOS-001](LOS-001-fix-phase-11-build-break-typecheck.md) | P0 | done | Fix Phase 11 build break (typecheck/build failing) | fix |
 | [LOS-002](LOS-002-enforce-draft-1-first-on-the.md) | P0 | done | Enforce Draft-1-first on the Coach chat API (audit gap #1) | research-validity |
-| [LOS-003](LOS-003-persist-phase-11-research-fields-in.md) | P0 | open | Persist Phase 11 research fields in Supabase mode | data-integrity |
+| [LOS-003](LOS-003-persist-phase-11-research-fields-in.md) | P0 | done | Persist Phase 11 research fields in Supabase mode | data-integrity |
 | [LOS-004](LOS-004-implement-supabase-teacher-observation-notes-currently.md) | P0 | open | Implement Supabase teacher observation notes (currently a stub) | data-integrity |
 | [LOS-005](LOS-005-remove-hardcoded-identities-and-counts-from.md) | P1 | done | Remove hardcoded identities and counts from teacher/student UI | correctness |
 | [LOS-006](LOS-006-use-real-cycle-field-for-paor.md) | P1 | done | Use real `cycle` field for PAOR filters instead of activityId heuristic | research-validity |

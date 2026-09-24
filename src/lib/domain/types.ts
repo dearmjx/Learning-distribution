@@ -236,6 +236,8 @@ export interface Revision {
   createdAt: string;
   idempotencyKey?: string;
   cycle?: PaorCycle;
+  draft1Frozen?: boolean;
+  draft1FrozenAt?: string;
   feedbackDecisions?: FeedbackDecision[];
 }
 

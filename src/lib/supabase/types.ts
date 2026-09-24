@@ -2,10 +2,14 @@ import type {
   AdiPhase,
   CerResponse,
   CoachResponse,
+  FeedbackDecision,
   InvestigationData,
   LearningContext,
+  PaorCycle,
   PeerReviewScores,
   RubricDimension,
+  SyntheticThinkingRubricScores,
+  TeacherReviewRubricScores,
 } from "@/lib/domain/types";
 
 export type Json =
@@ -81,9 +85,9 @@ export interface Database {
         Relationships: [];
       };
       activities: {
-        Row: { id: string; course_id: string; unit: string; title: string; adi_phase: AdiPhase; prompt: string; context: string; rubric_dimensions: RubricDimension[]; peer_review_allowed: boolean; created_at: string };
-        Insert: { id: string; course_id: string; unit: string; title: string; adi_phase: AdiPhase; prompt: string; context: string; rubric_dimensions: RubricDimension[]; peer_review_allowed?: boolean; created_at?: string };
-        Update: { id?: string; course_id?: string; unit?: string; title?: string; adi_phase?: AdiPhase; prompt?: string; context?: string; rubric_dimensions?: RubricDimension[]; peer_review_allowed?: boolean };
+        Row: { id: string; course_id: string; unit: string; chapter_id: string | null; title: string; adi_phase: AdiPhase; cycle: PaorCycle | null; prompt: string; context: string; rubric_dimensions: RubricDimension[]; peer_review_allowed: boolean; created_at: string };
+        Insert: { id: string; course_id: string; unit: string; chapter_id?: string | null; title: string; adi_phase: AdiPhase; cycle?: PaorCycle | null; prompt: string; context: string; rubric_dimensions: RubricDimension[]; peer_review_allowed?: boolean; created_at?: string };
+        Update: { id?: string; course_id?: string; unit?: string; chapter_id?: string | null; title?: string; adi_phase?: AdiPhase; cycle?: PaorCycle | null; prompt?: string; context?: string; rubric_dimensions?: RubricDimension[]; peer_review_allowed?: boolean };
         Relationships: [];
       };
       activity_assignments: {
@@ -99,15 +103,15 @@ export interface Database {
         Relationships: [];
       };
       submissions: {
-        Row: { id: string; student_id: string; activity_id: string; profile_id: string | null; class_id: string | null; version: number; content: CerResponse; investigation_data: InvestigationData | null; hint_depth: "none" | "shallow" | "concept" | "deep"; hint_cost: number; response_time_seconds: number; workflow_state: string; previous_draft_id: string | null; idempotency_key: string | null; submitted_at: string; updated_at: string };
-        Insert: { id?: string; student_id: string; activity_id: string; profile_id?: string | null; class_id?: string | null; version?: number; content: CerResponse; investigation_data?: InvestigationData | null; hint_depth?: "none" | "shallow" | "concept" | "deep"; hint_cost?: number; response_time_seconds?: number; workflow_state?: string; previous_draft_id?: string | null; idempotency_key?: string | null; submitted_at?: string; updated_at?: string };
-        Update: { id?: string; student_id?: string; activity_id?: string; profile_id?: string | null; class_id?: string | null; version?: number; content?: CerResponse; investigation_data?: InvestigationData | null; hint_depth?: "none" | "shallow" | "concept" | "deep"; hint_cost?: number; response_time_seconds?: number; workflow_state?: string; previous_draft_id?: string | null; idempotency_key?: string | null; updated_at?: string };
+        Row: { id: string; student_id: string; activity_id: string; profile_id: string | null; class_id: string | null; version: number; content: CerResponse; investigation_data: InvestigationData | null; hint_depth: "none" | "shallow" | "concept" | "deep"; hint_cost: number; response_time_seconds: number; workflow_state: string; previous_draft_id: string | null; idempotency_key: string | null; cycle: PaorCycle | null; draft1_frozen: boolean | null; draft1_frozen_at: string | null; feedback_decisions: FeedbackDecision[] | null; submitted_at: string; updated_at: string };
+        Insert: { id?: string; student_id: string; activity_id: string; profile_id?: string | null; class_id?: string | null; version?: number; content: CerResponse; investigation_data?: InvestigationData | null; hint_depth?: "none" | "shallow" | "concept" | "deep"; hint_cost?: number; response_time_seconds?: number; workflow_state?: string; previous_draft_id?: string | null; idempotency_key?: string | null; cycle?: PaorCycle | null; draft1_frozen?: boolean | null; draft1_frozen_at?: string | null; feedback_decisions?: FeedbackDecision[] | null; submitted_at?: string; updated_at?: string };
+        Update: { id?: string; student_id?: string; activity_id?: string; profile_id?: string | null; class_id?: string | null; version?: number; content?: CerResponse; investigation_data?: InvestigationData | null; hint_depth?: "none" | "shallow" | "concept" | "deep"; hint_cost?: number; response_time_seconds?: number; workflow_state?: string; previous_draft_id?: string | null; idempotency_key?: string | null; cycle?: PaorCycle | null; draft1_frozen?: boolean | null; draft1_frozen_at?: string | null; feedback_decisions?: FeedbackDecision[] | null; updated_at?: string };
         Relationships: [];
       };
       revisions: {
-        Row: { id: string; submission_id: string; student_id: string; activity_id: string; profile_id: string | null; class_id: string | null; version: number; content: CerResponse; investigation_data: InvestigationData | null; idempotency_key: string | null; created_at: string };
-        Insert: { id?: string; submission_id: string; student_id: string; activity_id: string; profile_id?: string | null; class_id?: string | null; version: number; content: CerResponse; investigation_data?: InvestigationData | null; idempotency_key?: string | null; created_at?: string };
-        Update: { id?: string; submission_id?: string; student_id?: string; activity_id?: string; profile_id?: string | null; class_id?: string | null; version?: number; content?: CerResponse; investigation_data?: InvestigationData | null; idempotency_key?: string | null };
+        Row: { id: string; submission_id: string; student_id: string; activity_id: string; profile_id: string | null; class_id: string | null; version: number; content: CerResponse; investigation_data: InvestigationData | null; idempotency_key: string | null; cycle: PaorCycle | null; draft1_frozen: boolean | null; draft1_frozen_at: string | null; feedback_decisions: FeedbackDecision[] | null; created_at: string };
+        Insert: { id?: string; submission_id: string; student_id: string; activity_id: string; profile_id?: string | null; class_id?: string | null; version: number; content: CerResponse; investigation_data?: InvestigationData | null; idempotency_key?: string | null; cycle?: PaorCycle | null; draft1_frozen?: boolean | null; draft1_frozen_at?: string | null; feedback_decisions?: FeedbackDecision[] | null; created_at?: string };
+        Update: { id?: string; submission_id?: string; student_id?: string; activity_id?: string; profile_id?: string | null; class_id?: string | null; version?: number; content?: CerResponse; investigation_data?: InvestigationData | null; idempotency_key?: string | null; cycle?: PaorCycle | null; draft1_frozen?: boolean | null; draft1_frozen_at?: string | null; feedback_decisions?: FeedbackDecision[] | null };
         Relationships: [];
       };
       ai_sessions: {
@@ -147,14 +151,14 @@ export interface Database {
         Relationships: [];
       };
       teacher_reviews: {
-        Row: { id: string; submission_id: string; teacher_id: string; teacher_profile_id: string | null; class_id: string | null; scores: Record<string, number>; feedback: string; final_score: number; authorship_review_decision: string; created_at: string };
-        Insert: { id?: string; submission_id: string; teacher_id: string; teacher_profile_id?: string | null; class_id?: string | null; scores: Record<string, number>; feedback?: string; final_score: number; authorship_review_decision?: string; created_at?: string };
-        Update: { teacher_id?: string; teacher_profile_id?: string | null; class_id?: string | null; scores?: Record<string, number>; feedback?: string; final_score?: number; authorship_review_decision?: string };
+        Row: { id: string; submission_id: string; teacher_id: string; teacher_profile_id: string | null; class_id: string | null; scores: Record<string, number>; rubric_scores: TeacherReviewRubricScores | null; synthetic_scores: SyntheticThinkingRubricScores | null; cycle: PaorCycle | null; feedback: string; final_score: number; authorship_review_decision: string; created_at: string };
+        Insert: { id?: string; submission_id: string; teacher_id: string; teacher_profile_id?: string | null; class_id?: string | null; scores?: Record<string, number>; rubric_scores?: TeacherReviewRubricScores | null; synthetic_scores?: SyntheticThinkingRubricScores | null; cycle?: PaorCycle | null; feedback?: string; final_score: number; authorship_review_decision?: string; created_at?: string };
+        Update: { teacher_id?: string; teacher_profile_id?: string | null; class_id?: string | null; scores?: Record<string, number>; rubric_scores?: TeacherReviewRubricScores | null; synthetic_scores?: SyntheticThinkingRubricScores | null; cycle?: PaorCycle | null; feedback?: string; final_score?: number; authorship_review_decision?: string };
         Relationships: [];
       };
       learning_events: {
-        Row: { id: string; schema_version: number; student_id: string; activity_id: string; profile_id: string | null; class_id: string | null; event_type: string; payload: Record<string, unknown>; context: Record<string, unknown>; actor: Record<string, unknown>; correlation_id: string; idempotency_key: string | null; occurred_at: string; created_at: string };
-        Insert: { id?: string; schema_version?: number; student_id: string; activity_id: string; profile_id?: string | null; class_id?: string | null; event_type: string; payload?: Record<string, unknown>; context?: Json; actor?: Json; correlation_id: string; idempotency_key?: string | null; occurred_at?: string; created_at?: string };
+        Row: { id: string; schema_version: number; student_id: string; activity_id: string; profile_id: string | null; class_id: string | null; event_type: string; payload: Record<string, unknown>; context: Record<string, unknown>; actor: Record<string, unknown>; correlation_id: string; idempotency_key: string | null; cycle: PaorCycle | null; occurred_at: string; created_at: string };
+        Insert: { id?: string; schema_version?: number; student_id: string; activity_id: string; profile_id?: string | null; class_id?: string | null; event_type: string; payload?: Record<string, unknown>; context?: Json; actor?: Json; correlation_id: string; idempotency_key?: string | null; cycle?: PaorCycle | null; occurred_at?: string; created_at?: string };
         Update: Empty;
         Relationships: [];
       };

@@ -89,6 +89,8 @@ export async function POST(request: Request) {
       version: submission.version,
       content: input.content,
       cycle,
+      draft1Frozen: isFrozen,
+      draft1FrozenAt: isFrozen ? now : undefined,
       feedbackDecisions: parsed.data.feedbackDecisions,
       idempotencyKey: `${requestId}:revision`,
     });

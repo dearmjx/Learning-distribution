@@ -510,3 +510,24 @@ For the Supabase test tomorrow (LOS-003):
 - Persist `syntheticScores` and `cycle` on teacher reviews.
 - LOS-004: persist observation notes.
 - LOS-005 remainder: the roster route and the student picker should use real memberships.
+
+## LOS-003 — Persist Phase 11 research fields in Supabase mode — 2026-09-25
+
+Status: DONE.
+
+Files changed:
+- `supabase/migrations/008_phase11_research_fields.sql` (new) — adds `cycle` (`1|2`, nullable), `draft1_frozen`, `draft1_frozen_at`, and `feedback_decisions` (`jsonb`) on `submissions` and `revisions`; `rubric_scores` (`jsonb`, CER only), `synthetic_scores` (`jsonb`), and `cycle` on `teacher_reviews`; and `cycle`/`chapter_id` on `activities` and `learning_events`, keeping class-scoped RLS from migrations 006/007 intact.
+- `src/lib/supabase/types.ts` — updated `Database` types for `activities`, `submissions`, `revisions`, `teacher_reviews`, and `learning_events`.
+- `src/lib/domain/types.ts` — added optional `draft1Frozen` and `draft1FrozenAt` to `Revision`.
+- `src/lib/repository/supabase-repository.ts` — writes and reads Phase 11 research fields in `addSubmission`, `addRevision`, `addTeacherReview`, `listTeacherReviews`, `getActivity`, `listActivities`, `appendLearningEvent`, and the row mappers (`mapSubmission`, `mapRevision`, `mapTeacherReview`, `mapEvent`).
+- `src/app/api/sessions/route.ts` — passes `draft1Frozen` and `draft1FrozenAt` into `repository.addRevision`.
+- `src/lib/supabase-repository.test.ts` — added round-trip and wide-export test coverage for `SupabaseRepository`.
+- `tickets/LOS-003-persist-phase-11-research-fields-in.md`, `tickets/README.md` — marked LOS-003 done.
+
+Commands run and actual results:
+- `npm.cmd run typecheck` → PASSED (0 errors, exit code 0).
+- `npm.cmd test` → PASSED (16 test files / 60 tests passed, exit code 0).
+- `npm.cmd run build` → PASSED (24 routes compiled cleanly, exit code 0).
+
+Next action: LOS-004 (Supabase teacher observation notes).
+

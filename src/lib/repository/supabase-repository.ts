@@ -42,6 +42,10 @@ function mapSubmission(data: Database["public"]["Tables"]["submissions"]["Row"])
     previousDraftId: data.previous_draft_id ?? undefined,
     submittedAt: data.submitted_at,
     idempotencyKey: data.idempotency_key ?? undefined,
+    cycle: data.cycle ?? undefined,
+    draft1Frozen: data.draft1_frozen ?? undefined,
+    draft1FrozenAt: data.draft1_frozen_at ?? undefined,
+    feedbackDecisions: data.feedback_decisions ?? undefined,
   };
 }
 
@@ -55,6 +59,24 @@ function mapRevision(data: Database["public"]["Tables"]["revisions"]["Row"]): Re
     content: data.content,
     createdAt: data.created_at,
     idempotencyKey: data.idempotency_key ?? undefined,
+    cycle: data.cycle ?? undefined,
+    draft1Frozen: data.draft1_frozen ?? undefined,
+    draft1FrozenAt: data.draft1_frozen_at ?? undefined,
+    feedbackDecisions: data.feedback_decisions ?? undefined,
+  };
+}
+
+function mapTeacherReview(data: Database["public"]["Tables"]["teacher_reviews"]["Row"]): TeacherReview {
+  return {
+    id: data.id,
+    submissionId: data.submission_id,
+    teacherId: data.teacher_id,
+    score: Number(data.final_score),
+    comment: data.feedback,
+    rubricScores: data.rubric_scores ?? undefined,
+    syntheticScores: data.synthetic_scores ?? undefined,
+    cycle: data.cycle ?? undefined,
+    createdAt: data.created_at,
   };
 }
 
@@ -88,6 +110,7 @@ function mapEvent(data: Database["public"]["Tables"]["learning_events"]["Row"]):
     occurredAt: data.occurred_at,
     createdAt: data.created_at,
     idempotencyKey: data.idempotency_key ?? undefined,
+    cycle: data.cycle ?? undefined,
   };
 }
 
@@ -106,8 +129,10 @@ export class SupabaseRepository implements ScopedLearningRepository {
           id: data.id,
           courseId: data.course_id,
           unit: data.unit,
+          chapterId: data.chapter_id ?? undefined,
           title: data.title,
           adiPhase: data.adi_phase,
+          cycle: data.cycle ?? undefined,
           prompt: data.prompt,
           context: data.context,
           rubricDimensions: data.rubric_dimensions,
@@ -123,8 +148,10 @@ export class SupabaseRepository implements ScopedLearningRepository {
       id: item.id,
       courseId: item.course_id,
       unit: item.unit,
+      chapterId: item.chapter_id ?? undefined,
       title: item.title,
       adiPhase: item.adi_phase,
+      cycle: item.cycle ?? undefined,
       prompt: item.prompt,
       context: item.context,
       rubricDimensions: item.rubric_dimensions,
@@ -148,6 +175,10 @@ export class SupabaseRepository implements ScopedLearningRepository {
       profile_id: this.scope.profileId ?? null,
       class_id: this.scope.context.classId,
       idempotency_key: input.idempotencyKey ?? null,
+      cycle: input.cycle ?? null,
+      draft1_frozen: input.draft1Frozen ?? false,
+      draft1_frozen_at: input.draft1FrozenAt ?? null,
+      feedback_decisions: input.feedbackDecisions ?? null,
     };
     const query = row.idempotency_key
       ? this.client.from("submissions").upsert(row, { onConflict: "profile_id,idempotency_key" }).select().single()
@@ -211,6 +242,10 @@ export class SupabaseRepository implements ScopedLearningRepository {
       profile_id: this.scope.profileId ?? null,
       class_id: this.scope.context.classId,
       idempotency_key: input.idempotencyKey ?? null,
+      cycle: input.cycle ?? null,
+      draft1_frozen: input.draft1Frozen ?? false,
+      draft1_frozen_at: input.draft1FrozenAt ?? null,
+      feedback_decisions: input.feedbackDecisions ?? null,
     };
     const query = row.idempotency_key
       ? this.client.from("revisions").upsert(row, { onConflict: "profile_id,idempotency_key" }).select().single()
@@ -425,20 +460,16 @@ export class SupabaseRepository implements ScopedLearningRepository {
         teacher_profile_id: this.scope.profileId ?? null,
         class_id: this.scope.context.classId,
         scores: { holistic: input.score },
+        rubric_scores: input.rubricScores ?? null,
+        synthetic_scores: input.syntheticScores ?? null,
+        cycle: input.cycle ?? null,
         final_score: input.score,
         feedback: input.comment,
       })
       .select()
       .single();
     if (error || !data) throw new Error(`Supabase teacher review write failed: ${error?.message ?? "empty response"}`);
-    return {
-      id: data.id,
-      submissionId: data.submission_id,
-      teacherId: data.teacher_id,
-      score: data.final_score,
-      comment: data.feedback,
-      createdAt: data.created_at,
-    };
+    return mapTeacherReview(data);
   }
 
   async listTeacherReviews(submissionId?: string): Promise<TeacherReview[]> {
@@ -446,14 +477,7 @@ export class SupabaseRepository implements ScopedLearningRepository {
     if (submissionId) query = query.eq("submission_id", submissionId);
     const { data, error } = await query;
     if (error) throw new Error(`Supabase teacher review list failed: ${error.message}`);
-    return (data ?? []).map((item) => ({
-      id: item.id,
-      submissionId: item.submission_id,
-      teacherId: item.teacher_id,
-      score: item.final_score,
-      comment: item.feedback,
-      createdAt: item.created_at,
-    }));
+    return (data ?? []).map(mapTeacherReview);
   }
 
   async addTeacherObservationNote(input: Omit<TeacherObservationNote, "id" | "createdAt" | "updatedAt">): Promise<TeacherObservationNote> {
@@ -488,6 +512,7 @@ export class SupabaseRepository implements ScopedLearningRepository {
       correlation_id: event.correlationId,
       occurred_at: event.occurredAt,
       idempotency_key: event.idempotencyKey ?? null,
+      cycle: event.cycle ?? null,
       created_at: event.createdAt,
     };
     const query = row.idempotency_key
