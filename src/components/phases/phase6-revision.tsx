@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Activity, CerResponse, CoachFeedback, PeerReview, Submission } from "@/lib/domain/types";
+import type { Activity, CerResponse, CoachFeedback, FeedbackDecision, PeerReview, Submission } from "@/lib/domain/types";
 
 interface Phase6Props {
   activity: Activity;
@@ -14,7 +14,7 @@ interface Phase6Props {
 
 export function Phase6Revision({
   activity,
-  studentId = "demo-student-01",
+  studentId = "40101",
   initialCer,
   initialFeedback,
   onNext,
@@ -27,6 +27,7 @@ export function Phase6Revision({
   });
 
   const [peerReviews, setPeerReviews] = useState<PeerReview[]>([]);
+  const [feedbackDecisions, setFeedbackDecisions] = useState<Record<string, FeedbackDecision>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [revisedSubmission, setRevisedSubmission] = useState<Submission | null>(null);
@@ -42,7 +43,7 @@ export function Phase6Revision({
           setPeerReviews([
             {
               id: "peer-feedback-01",
-              submissionId: "demo-sub-01",
+              submissionId: "synthetic-sub-01",
               reviewerStudentId: "peer-student-05",
               authorStudentId: studentId,
               activityId: activity.id,
@@ -58,9 +59,35 @@ export function Phase6Revision({
       .catch(() => {});
   }, [activity.id, studentId]);
 
+  function handleDecisionChange(key: string, source: "ai_coach" | "peer", feedbackItem: string, status: "accept" | "reject" | "modify") {
+    setFeedbackDecisions((prev) => ({
+      ...prev,
+      [key]: {
+        id: prev[key]?.id ?? crypto.randomUUID(),
+        feedbackItem,
+        source,
+        status,
+        justificationText: prev[key]?.justificationText ?? (status === "accept" ? "นำข้อมูลและคำแนะนำมาปรับปรุงให้ข้อโต้แย้งสมบูรณ์ขึ้น" : status === "reject" ? "ข้อมูลเดิมครอบคลุมประเด็นนี้แล้ว" : "นำเฉพาะประเด็นเรื่องตัวเลขมาปรับใช้"),
+        createdAt: new Date().toISOString(),
+      },
+    }));
+  }
+
+  function handleJustificationChange(key: string, text: string) {
+    setFeedbackDecisions((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        justificationText: text,
+      },
+    }));
+  }
+
   async function submitRevision() {
     setSubmitting(true);
     setError("");
+
+    const decisionsList = Object.values(feedbackDecisions);
 
     try {
       const response = await fetch("/api/sessions", {
@@ -72,6 +99,7 @@ export function Phase6Revision({
           content: revisedCer,
           hintDepth: "none",
           responseTimeSeconds: 60,
+          feedbackDecisions: decisionsList,
         }),
       });
 
@@ -86,70 +114,168 @@ export function Phase6Revision({
     }
   }
 
+  const aiKey = "ai-coach-feedback";
+
   return (
     <div className="phase-container">
       <div className="phase-header-banner">
-        <span className="phase-pill">PHASE 6 / 7 · REVISION</span>
-        <h2>🔄 ปรับปรุงข้อโต้แย้งฉบับสมบูรณ์ (Final Argument Revision)</h2>
+        <span className="phase-pill">PHASE 6 / 7 · REVISION & CRITICAL EVALUATION</span>
+        <h2>🔄 ปรับปรุงข้อโต้แย้งและประเมิน Feedback (AI Literacy)</h2>
         <p className="phase-lead">
-          นำคำถามนำจาก AI Coach และข้อคิดเห็นจากเพื่อน มาขัดเกลาและปรับปรุงข้อโต้แย้ง CER ให้สมบูรณ์และรัดกุมที่สุด
+          ประเมินและตัดสินใจต่อคำแนะนำจาก AI Coach และเพื่อนร่วมชั้น (ยอมรับ / ปฏิเสธ / ปรับแก้ พร้อมระบุเหตุผล) เพื่อพัฒนาข้อโต้แย้ง CER ฉบับสมบูรณ์
         </p>
       </div>
 
       <div className="grid-2-col">
-        {/* Left Column: Feedback Received (AI Coach + Peers) */}
+        {/* Left Column: Feedback Evaluation Panel (AI Coach + Peers) */}
         <div className="card content-card">
           <div className="card-heading">
             <div>
-              <p className="eyebrow">FEEDBACK SUMMARY</p>
-              <h3>ข้อเสนอแนะที่ได้รับ</h3>
+              <p className="eyebrow">FEEDBACK CRITICAL EVALUATION</p>
+              <h3>ประเมินและตัดสินใจต่อ Feedback</h3>
             </div>
-            <span className="unit-badge">AI & Peer Insights</span>
+            <span className="unit-badge">AI Literacy · Critical Thinking</span>
           </div>
 
-          {/* AI Coach Suggestion */}
+          {/* AI Coach Suggestion Decision Block */}
           {initialFeedback && (
-            <div className="feedback-sub-card">
-              <span className="feedback-origin-tag">🌿 คำถามนำจาก AI Coach</span>
-              <blockquote>{initialFeedback.message}</blockquote>
-              <small className="muted-text">มิติมโนทัศน์ที่เน้น: {initialFeedback.targetDimension}</small>
+            <div className="feedback-decision-box" style={{
+              background: "#f0fdfa",
+              border: "1px solid #99f6e4",
+              borderRadius: "8px",
+              padding: "14px",
+              marginBottom: "16px",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <span className="feedback-origin-tag" style={{ background: "#ccfbf1", color: "#0f766e" }}>🌿 คำถามนำจาก AI Coach</span>
+                <span className="target-badge" style={{ fontSize: "0.75rem" }}>{initialFeedback.targetDimension}</span>
+              </div>
+              <blockquote style={{ margin: "0 0 10px 0", fontSize: "0.95rem", color: "#134e4a" }}>
+                {initialFeedback.message}
+              </blockquote>
+
+              <div style={{ margin: "10px 0 6px 0" }}>
+                <strong style={{ fontSize: "0.85rem", color: "#0f766e" }}>การตัดสินใจต่อนักโค้ช AI:</strong>
+                <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
+                  {(["accept", "reject", "modify"] as const).map((status) => {
+                    const active = feedbackDecisions[aiKey]?.status === status;
+                    const labels = { accept: "✅ ยอมรับ (Accept)", reject: "❌ ปฏิเสธ (Reject)", modify: "✏️ ปรับแก้ (Modify)" };
+                    const colors = { accept: "#059669", reject: "#dc2626", modify: "#d97706" };
+                    return (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => handleDecisionChange(aiKey, "ai_coach", initialFeedback.message, status)}
+                        style={{
+                          flex: 1,
+                          padding: "6px 4px",
+                          fontSize: "0.8rem",
+                          fontWeight: active ? 600 : 400,
+                          borderRadius: "6px",
+                          border: `1px solid ${active ? colors[status] : "#cbd5e1"}`,
+                          background: active ? `${colors[status]}15` : "#ffffff",
+                          color: active ? colors[status] : "#475569",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {labels[status]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {feedbackDecisions[aiKey] && (
+                <div style={{ marginTop: "10px" }}>
+                  <label htmlFor="ai-justification" style={{ fontSize: "0.8rem", color: "#0f766e", fontWeight: 600 }}>
+                    ระบุเหตุผลการตัดสินใจ (Justification):
+                  </label>
+                  <input
+                    id="ai-justification"
+                    type="text"
+                    className="form-input"
+                    style={{ width: "100%", marginTop: "4px", fontSize: "0.85rem" }}
+                    value={feedbackDecisions[aiKey]?.justificationText ?? ""}
+                    onChange={(e) => handleJustificationChange(aiKey, e.target.value)}
+                    placeholder="เช่น ยอมรับเพราะช่วยให้อธิบายกลไกกฎ 10% ได้ตรงประเด็นขึ้น..."
+                  />
+                </div>
+              )}
             </div>
           )}
 
-          {/* Peer Feedback List */}
+          {/* Peer Feedback List with Decisions */}
           <div className="peer-feedback-list">
-            <span className="feedback-origin-tag">👥 ความเห็นจากเพื่อนร่วมชั้น</span>
-            {peerReviews.map((rev) => (
-              <div key={rev.id} className="peer-review-bubble">
-                <p><strong>ความคิดเห็น:</strong> &ldquo;{rev.feedback}&rdquo;</p>
-                {rev.suggestions && (
-                  <p className="peer-sugg-line">
-                    💡 <strong>จุดแนะนำ:</strong> {rev.suggestions}
-                  </p>
-                )}
-                {rev.scores && (
-                  <div className="mini-score-bar">
-                    <span>คะแนน: Claim {rev.scores.claim}/5 · Evidence {rev.scores.evidence}/5 · Reasoning {rev.scores.reasoning}/5</span>
+            <span className="feedback-origin-tag" style={{ marginBottom: "10px", display: "inline-block" }}>👥 ข้อเสนอแนะจากเพื่อนร่วมชั้น</span>
+            {peerReviews.map((rev, idx) => {
+              const peerKey = `peer-feedback-${rev.id || idx}`;
+              const itemText = rev.suggestions || rev.feedback;
+              return (
+                <div key={peerKey} className="peer-review-bubble" style={{ marginBottom: "14px", border: "1px solid #e2e8f0" }}>
+                  <p style={{ margin: "0 0 6px 0" }}><strong>ความคิดเห็น:</strong> &ldquo;{rev.feedback}&rdquo;</p>
+                  {rev.suggestions && (
+                    <p className="peer-sugg-line" style={{ margin: "0 0 8px 0" }}>
+                      💡 <strong>จุดแนะนำ:</strong> {rev.suggestions}
+                    </p>
+                  )}
+
+                  <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px dashed #cbd5e1" }}>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {(["accept", "reject", "modify"] as const).map((status) => {
+                        const active = feedbackDecisions[peerKey]?.status === status;
+                        const labels = { accept: "✅ ยอมรับ", reject: "❌ ปฏิเสธ", modify: "✏️ ปรับแก้" };
+                        return (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => handleDecisionChange(peerKey, "peer", itemText, status)}
+                            style={{
+                              flex: 1,
+                              padding: "4px 2px",
+                              fontSize: "0.75rem",
+                              borderRadius: "4px",
+                              border: active ? "1px solid #3b82f6" : "1px solid #cbd5e1",
+                              background: active ? "#eff6ff" : "#fff",
+                              color: active ? "#1d4ed8" : "#475569",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {labels[status]}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {feedbackDecisions[peerKey] && (
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ width: "100%", marginTop: "6px", fontSize: "0.8rem", padding: "4px 8px" }}
+                        value={feedbackDecisions[peerKey]?.justificationText ?? ""}
+                        onChange={(e) => handleJustificationChange(peerKey, e.target.value)}
+                        placeholder="เหตุผลการตัดสินใจต่อข้อเสนอแนะเพื่อน..."
+                      />
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Right Column: Revised CER Editor */}
+        {/* Right Column: Revised CER Editor (Version 2) */}
         <div className="card content-card">
           <div className="card-heading">
             <div>
-              <p className="eyebrow">FINAL REVISION</p>
-              <h3>CER ฉบับปรับปรุง (Version 2)</h3>
+              <p className="eyebrow">FINAL REVISION (VERSION 2)</p>
+              <h3>CER ฉบับสมบูรณ์หลังพิจารณา Feedback</h3>
             </div>
             <span className="phase-label">Final Draft</span>
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="rev-claim">
-              <strong>1. Claim ฉบับปรับปรุง</strong>
+              <strong>1. Claim ฉบับปรับปรุง (ตอบตรงประเด็น ชัดเจน)</strong>
             </label>
             <textarea
               id="rev-claim"
@@ -162,7 +288,7 @@ export function Phase6Revision({
 
           <div className="form-group">
             <label className="form-label" htmlFor="rev-evidence">
-              <strong>2. Evidence ฉบับปรับปรุง (ระบุตัวเลขครบถ้วน)</strong>
+              <strong>2. Evidence ฉบับปรับปรุง (เลือกสรรข้อมูลและตัวเลขครบถ้วน)</strong>
             </label>
             <textarea
               id="rev-evidence"
@@ -175,7 +301,7 @@ export function Phase6Revision({
 
           <div className="form-group">
             <label className="form-label" htmlFor="rev-reasoning">
-              <strong>3. Reasoning ฉบับปรับปรุง (เชื่อมโยงกฎ 10% & กลไก)</strong>
+              <strong>3. Reasoning ฉบับปรับปรุง (สังเคราะห์ด้วยภาษาตนเอง & เชื่อมโยงกฎ 10%)</strong>
             </label>
             <textarea
               id="rev-reasoning"
@@ -198,7 +324,7 @@ export function Phase6Revision({
           {revisedSubmission && (
             <div className="success-banner revision-success">
               <h4>🎉 บันทึกฉบับสมบูรณ์แล้ว (Version {revisedSubmission.version})</h4>
-              <p>ระบบบันทึกประวัติการพัฒนา (Authorship Evolution) และส่งให้ครูผู้สอนตรวจเรียบร้อยแล้ว</p>
+              <p>ระบบบันทึกประวัติการพัฒนา (Authorship Evolution) และการประเมิน Feedback เรียบร้อยแล้ว</p>
             </div>
           )}
 

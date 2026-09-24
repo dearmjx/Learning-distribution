@@ -3,11 +3,13 @@ import type {
   AiSession,
   Classroom,
   Course,
+  PaorCycle,
   PeerReview,
   PeerReviewSubmission,
   Revision,
   StudentReflectionData,
   Submission,
+  TeacherObservationNote,
   TeacherReview,
 } from "@/lib/domain/types";
 import { ecosystemActivities, getActivity } from "@/data/course/ecosystem/activities";
@@ -20,6 +22,7 @@ import type {
   ReflectionRepository,
   RevisionRepository,
   SubmissionRepository,
+  TeacherObservationRepository,
   TeacherReviewRepository,
 } from "@/lib/repository/interfaces";
 
@@ -29,6 +32,7 @@ const aiSessions: AiSession[] = [];
 const aiInteractions: AiInteraction[] = [];
 const peerReviews: PeerReview[] = [];
 const teacherReviews: TeacherReview[] = [];
+const teacherObservationNotes: TeacherObservationNote[] = [];
 const reflections: StudentReflectionData[] = [];
 const customPeerSubmissions: PeerReviewSubmission[] = [];
 
@@ -111,7 +115,7 @@ const classrooms: Classroom[] = [{
   id: "biology-m4-class-a",
   schoolId: "demo-school-01",
   courseId: "biology-m4",
-  name: "ชีววิทยา ม.4 ห้อง A",
+  name: "ชีววิทยา ม.4 ห้อง A (4/1)",
   teacherIds: ["demo-teacher-01"],
   studentIds: ["demo-student-01"],
 }];
@@ -126,7 +130,8 @@ export class InMemoryLearningRepository
     AiSessionRepository,
     PeerReviewRepository,
     ReflectionRepository,
-    TeacherReviewRepository
+    TeacherReviewRepository,
+    TeacherObservationRepository
 {
   getCourse(courseId: string): Course | undefined { return courses.find((course) => course.id === courseId); }
   listCourses(schoolId: string): Course[] { return courses.filter((course) => course.schoolId === schoolId); }
@@ -156,6 +161,8 @@ export class InMemoryLearningRepository
   listReflections(studentId?: string, activityId?: string): StudentReflectionData[] { return listReflections(studentId, activityId); }
   addTeacherReview(input: Omit<TeacherReview, "id" | "createdAt">): TeacherReview { return addTeacherReview(input); }
   listTeacherReviews(submissionId?: string): TeacherReview[] { return listTeacherReviews(submissionId); }
+  addTeacherObservationNote(input: Omit<TeacherObservationNote, "id" | "createdAt" | "updatedAt">): TeacherObservationNote { return addTeacherObservationNote(input); }
+  listTeacherObservationNotes(teacherId?: string, cycle?: PaorCycle, activityId?: string): TeacherObservationNote[] { return listTeacherObservationNotes(teacherId, cycle, activityId); }
 }
 
 export function addSubmission(
@@ -352,6 +359,27 @@ export function listTeacherReviews(submissionId?: string): TeacherReview[] {
   return teacherReviews.filter((review) => !submissionId || review.submissionId === submissionId).slice();
 }
 
+export function addTeacherObservationNote(input: Omit<TeacherObservationNote, "id" | "createdAt" | "updatedAt">): TeacherObservationNote {
+  const now = new Date().toISOString();
+  const record: TeacherObservationNote = {
+    ...input,
+    id: crypto.randomUUID(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  teacherObservationNotes.push(record);
+  return record;
+}
+
+export function listTeacherObservationNotes(teacherId?: string, cycle?: PaorCycle, activityId?: string): TeacherObservationNote[] {
+  return teacherObservationNotes.filter(
+    (note) =>
+      (!teacherId || note.teacherId === teacherId) &&
+      (!cycle || note.cycle === cycle) &&
+      (!activityId || note.activityId === activityId),
+  ).slice();
+}
+
 export function listSubmissions(studentId?: string, activityId?: string): Submission[] {
   return submissions.filter(
     (submission) =>
@@ -371,6 +399,7 @@ export function clearMemoryRepositoriesForTests(): void {
   aiInteractions.length = 0;
   peerReviews.length = 0;
   teacherReviews.length = 0;
+  teacherObservationNotes.length = 0;
   reflections.length = 0;
   customPeerSubmissions.length = 0;
   syntheticPeerSubmissions.length = 0;
@@ -378,3 +407,4 @@ export function clearMemoryRepositoriesForTests(): void {
 }
 
 export const learningRepository = new InMemoryLearningRepository();
+

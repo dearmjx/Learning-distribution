@@ -3,11 +3,13 @@ import type {
   AiInteraction,
   AiSession,
   LearningEvent,
+  PaorCycle,
   PeerReview,
   PeerReviewSubmission,
   Revision,
   StudentReflectionData,
   Submission,
+  TeacherObservationNote,
   TeacherReview,
 } from "@/lib/domain/types";
 import { DEMO_SCOPE } from "@/lib/context/learning-context";
@@ -103,6 +105,14 @@ class MemoryScopedLearningRepository implements ScopedLearningRepository {
     return memory.addTeacherReview({ ...input, teacherId: this.identity.context.teacherId });
   }
   async listTeacherReviews(submissionId?: string): Promise<TeacherReview[]> { return memory.listTeacherReviews(submissionId); }
+  async addTeacherObservationNote(input: Omit<TeacherObservationNote, "id" | "createdAt" | "updatedAt">): Promise<TeacherObservationNote> {
+    if (this.identity.context.role !== "teacher" || !this.identity.context.teacherId) throw new Error("Teacher scope required");
+    return memory.addTeacherObservationNote({ ...input, teacherId: this.identity.context.teacherId, classId: this.identity.context.classId });
+  }
+  async listTeacherObservationNotes(teacherId?: string, cycle?: PaorCycle, activityId?: string): Promise<TeacherObservationNote[]> {
+    if (this.identity.context.role !== "teacher" || !this.identity.context.teacherId) throw new Error("Teacher scope required");
+    return memory.listTeacherObservationNotes(teacherId, cycle, activityId);
+  }
   async appendLearningEvent(event: LearningEvent): Promise<LearningEvent> {
     if (this.identity.context.role === "student") this.studentId(event.studentId);
     return learningEventStore.append(event);

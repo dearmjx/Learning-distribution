@@ -8,6 +8,7 @@ export interface MessageItem {
   id: string;
   role: "user" | "assistant";
   content: string;
+  mode?: "coach" | "opponent";
   createdAt: string;
   telemetryPill?: string;
 }
@@ -29,6 +30,7 @@ const QUICK_PROMPTS = [
 
 export function SocraticCoachChat({
   activityId,
+  activity,
   studentId = "demo-student-01",
   studentCer,
   initialCoachFeedback,
@@ -38,7 +40,16 @@ export function SocraticCoachChat({
   const [loading, setLoading] = useState(false);
   const [chatSeconds, setChatSeconds] = useState(0);
   const [error, setError] = useState("");
+  const [mode, setMode] = useState<"coach" | "opponent">("coach");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const quickPrompts = activity
+    ? [
+        `แนวคิดสำคัญของบท "${activity.unit}" เชื่อมกับคำถามนี้อย่างไร?`,
+        "จากบริบทกิจกรรม มีข้อมูลส่วนใดเหมาะจะใช้เป็น Evidence?",
+        "ช่วยตั้งคำถามเพื่อตรวจสอบ Reasoning ของผมหน่อยครับ",
+        "ข้อมูลส่วนใดช่วยให้ผมตอบตรงประเด็นมากขึ้น?",
+      ]
+    : QUICK_PROMPTS;
 
   // Initialize with initial coach feedback if available
   useEffect(() => {
@@ -109,6 +120,7 @@ export function SocraticCoachChat({
         body: JSON.stringify({
           studentId,
           activityId,
+          mode,
           message: text,
           studentCer,
           history: messages.map((m) => ({ role: m.role, content: m.content })),
@@ -143,6 +155,7 @@ export function SocraticCoachChat({
       const coachMessage: MessageItem = {
         id: `coach-${Date.now()}`,
         role: "assistant",
+        mode,
         content: data.message,
         createdAt: new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }),
         telemetryPill: data.telemetry
@@ -166,8 +179,30 @@ export function SocraticCoachChat({
           <p className="eyebrow">SOCRATIC DEEP DIVE · 3 POINTS</p>
           <h2>💬 AI Coach Mini-Chat</h2>
         </div>
-        <span className="phase-label live-badge">Live Coach Active</span>
+        <div style={{ display: "flex", gap: "6px" }} role="group" aria-label="โหมด AI">
+          <button
+            type="button"
+            className={`filter-pill ${mode === "coach" ? "active" : ""}`}
+            aria-pressed={mode === "coach"}
+            onClick={() => setMode("coach")}
+          >
+            🌿 โค้ชถามนำ
+          </button>
+          <button
+            type="button"
+            className={`filter-pill ${mode === "opponent" ? "active" : ""}`}
+            aria-pressed={mode === "opponent"}
+            onClick={() => setMode("opponent")}
+          >
+            ⚖️ ฝ่ายค้านท้าทาย Claim
+          </button>
+        </div>
       </div>
+      {mode === "opponent" && (
+        <p className="small-note" style={{ margin: "0 0 8px", color: "#64748b" }}>
+          AI ฝ่ายค้านจะเสนอข้อโต้แย้งหนึ่งข้อต่อ Claim ของคุณ ลองใช้หลักฐานตอบกลับ (AI จะไม่เฉลยว่าใครถูก)
+        </p>
+      )}
 
       <div className="chat-messages-container">
         {messages.map((item) => (
@@ -177,7 +212,7 @@ export function SocraticCoachChat({
           >
             <div className={`chat-bubble ${item.role === "user" ? "chat-bubble-user" : "chat-bubble-coach"}`}>
               <div className="chat-author-tag">
-                {item.role === "user" ? `🧑‍🎓 นักเรียน (${studentId})` : "🌿 อาจารย์ AI Coach"}
+                {item.role === "user" ? `🧑‍🎓 นักเรียน (${studentId})` : item.mode === "opponent" ? "⚖️ AI ฝ่ายค้าน" : "🌿 อาจารย์ AI Coach"}
                 <span className="chat-time">{item.createdAt}</span>
               </div>
               <p className="chat-text">{item.content}</p>
@@ -214,7 +249,7 @@ export function SocraticCoachChat({
       <div className="quick-prompts-bar">
         <span className="quick-label">💡 คำถามด่วน:</span>
         <div className="quick-chips">
-          {QUICK_PROMPTS.map((prompt) => (
+          {quickPrompts.map((prompt) => (
             <button
               key={prompt}
               type="button"
@@ -241,7 +276,7 @@ export function SocraticCoachChat({
           className="chat-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="พิมพ์ข้อความถาม AI Coach (เช่น เหตุใดพลังงานจึงสูญเสียไป?)..."
+          placeholder={`พิมพ์ข้อความถาม AI Coach เกี่ยวกับบท ${activity?.unit ?? "เรียนรู้นี้"}...`}
           disabled={loading}
         />
         <button

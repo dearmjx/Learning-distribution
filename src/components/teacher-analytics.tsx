@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { TeacherReviewSnapshot } from "@/lib/teacher/review-types";
+import { GrowthAnalyticsPanel } from "@/components/growth-analytics-panel";
 
 export function TeacherAnalytics() {
   const [data, setData] = useState<TeacherReviewSnapshot | null>(null);
@@ -20,17 +21,17 @@ export function TeacherAnalytics() {
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "โหลด analytics ไม่สำเร็จ"));
   }, []);
 
-  async function handleDownload(format: "json" | "csv") {
+  async function handleDownload(format: "json" | "csv", mode: "wide" | "events" = "wide") {
     setDownloading(format);
     try {
-      const url = `/api/research/export?format=${format}${activityFilter !== "all" ? `&activityId=${activityFilter}` : ""}`;
+      const url = `/api/research/export?format=${format}&mode=${mode}${activityFilter !== "all" ? `&activityId=${activityFilter}` : ""}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = downloadUrl;
-      a.download = `learning-evidence-export.${format}`;
+      a.download = mode === "wide" ? `research-wide-dataset-spss-r.${format}` : `learning-evidence-events.${format}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -123,27 +124,38 @@ export function TeacherAnalytics() {
                   <option value="ecosystem-energy-flow-01">⚡ กิจกรรม 2: การถ่ายทอดพลังงาน</option>
                 </select>
 
-                <div className="export-btn-pair">
+                <div className="export-btn-pair" style={{ display: "flex", gap: "8px" }}>
                   <button
                     type="button"
                     className="primary-button compact-button"
-                    onClick={() => void handleDownload("json")}
+                    style={{ background: "#059669", borderColor: "#047857" }}
+                    onClick={() => void handleDownload("csv", "wide")}
                     disabled={downloading !== ""}
                   >
-                    {downloading === "json" ? "กำลังสร้าง..." : "📄 Export JSON"}
+                    {downloading === "csv" ? "กำลังสร้าง..." : "📊 Export SPSS/R CSV (Wide)"}
                   </button>
                   <button
                     type="button"
                     className="secondary-button compact-button"
-                    onClick={() => void handleDownload("csv")}
+                    onClick={() => void handleDownload("json", "wide")}
                     disabled={downloading !== ""}
                   >
-                    {downloading === "csv" ? "กำลังสร้าง..." : "📊 Export CSV"}
+                    {downloading === "json" ? "กำลังสร้าง..." : "📄 Export JSON (Wide)"}
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button compact-button"
+                    onClick={() => void handleDownload("csv", "events")}
+                    disabled={downloading !== ""}
+                  >
+                    📜 Raw Events CSV
                   </button>
                 </div>
               </div>
             </div>
           </section>
+
+          <GrowthAnalyticsPanel />
 
           {/* Event Catalog Breakdown */}
           <section className="card analytics-card">

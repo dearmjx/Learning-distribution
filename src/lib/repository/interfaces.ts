@@ -5,11 +5,13 @@ import type {
   Classroom,
   Course,
   LearningEvent,
+  PaorCycle,
   PeerReview,
   PeerReviewSubmission,
   Revision,
   StudentReflectionData,
   Submission,
+  TeacherObservationNote,
   TeacherReview,
 } from "@/lib/domain/types";
 
@@ -66,6 +68,11 @@ export interface TeacherReviewRepository {
   listTeacherReviews(submissionId?: string): TeacherReview[];
 }
 
+export interface TeacherObservationRepository {
+  addTeacherObservationNote(input: Omit<TeacherObservationNote, "id" | "createdAt" | "updatedAt">): TeacherObservationNote;
+  listTeacherObservationNotes(teacherId?: string, cycle?: PaorCycle, activityId?: string): TeacherObservationNote[];
+}
+
 export interface LearningEventRepository {
   append(event: LearningEvent): LearningEvent;
   list(studentId?: string, activityId?: string): LearningEvent[];
@@ -93,6 +100,8 @@ export interface ScopedLearningRepository {
   listReflections(studentId?: string, activityId?: string): Promise<StudentReflectionData[]>;
   addTeacherReview(input: Omit<TeacherReview, "id" | "createdAt">): Promise<TeacherReview>;
   listTeacherReviews(submissionId?: string): Promise<TeacherReview[]>;
+  addTeacherObservationNote(input: Omit<TeacherObservationNote, "id" | "createdAt" | "updatedAt">): Promise<TeacherObservationNote>;
+  listTeacherObservationNotes(teacherId?: string, cycle?: PaorCycle, activityId?: string): Promise<TeacherObservationNote[]>;
   appendLearningEvent(event: LearningEvent): Promise<LearningEvent>;
   listLearningEvents(studentId?: string, activityId?: string): Promise<LearningEvent[]>;
 }

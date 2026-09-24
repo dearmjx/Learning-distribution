@@ -58,12 +58,13 @@ src/
 ├── app/                         # Next.js UI และ API routes
 │   └── api/
 ├── components/                  # UI components
-├── data/course/ecosystem/       # เนื้อหาและกิจกรรมชีวะ ม.4
+├── data/course/                 # เนื้อหา กิจกรรม และ approved knowledge chunks
 └── lib/
     ├── ai/                      # LLM provider + coach policy
     ├── analytics/               # authorship indicators
     ├── domain/                  # domain types
     ├── events/                  # learning timeline
+    ├── knowledge/               # scoped BM25/RRF retrieval + approved context
     └── repository/              # in-memory MVP adapters
 
 docs/
@@ -78,9 +79,11 @@ research-source/
 
 เอกสารสำหรับคุยกับอาจารย์อยู่ที่ [`docs/11_ADVISOR_QA_SESSION.md`](docs/11_ADVISOR_QA_SESSION.md)
 แผน migration หลักอยู่ที่ [`docs/phase-x.md`](docs/phase-x.md)
+วิธีเพิ่มบทเรียนและปรับ RAG อยู่ที่ [`docs/CUSTOMIZE_RAG.md`](docs/CUSTOMIZE_RAG.md)
 ส่วนเอกสารต้นฉบับจาก ZIP อยู่ที่ [`research-source/`](research-source/)
 
 ## Important limitation
 
 ตอนนี้ repository เป็น MVP แบบ in-memory เพื่อให้ทดสอบ interaction flow ได้เร็ว ข้อมูลจะหายเมื่อ process restart
-ขั้นถัดไปคือเปลี่ยน repository เป็น Postgres/Supabase และทำ consent/authentication ก่อน pilot กับนักเรียนจริง
+RAG มี approved knowledge registry แบบ static และใช้ Thai-aware BM25 เป็นค่าเริ่มต้น โดยมี port สำหรับต่อ dense/vector retriever แล้ว แต่ยังไม่ได้ต่อ knowledge repository กับ pgvector
+ขั้นถัดไปคือเปลี่ยน repository เป็น Postgres/Supabase, ต่อ vector knowledge store และทำ consent/authentication ก่อน pilot กับนักเรียนจริง

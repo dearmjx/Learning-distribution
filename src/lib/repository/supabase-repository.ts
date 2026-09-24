@@ -5,11 +5,13 @@ import type {
   AiSession,
   LearningContext,
   LearningEvent,
+  PaorCycle,
   PeerReview,
   PeerReviewSubmission,
   Revision,
   StudentReflectionData,
   Submission,
+  TeacherObservationNote,
   TeacherReview,
 } from "@/lib/domain/types";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -452,6 +454,22 @@ export class SupabaseRepository implements ScopedLearningRepository {
       comment: item.feedback,
       createdAt: item.created_at,
     }));
+  }
+
+  async addTeacherObservationNote(input: Omit<TeacherObservationNote, "id" | "createdAt" | "updatedAt">): Promise<TeacherObservationNote> {
+    if (this.scope.context.role !== "teacher" || !this.scope.context.teacherId) throw new Error("Only a teacher can record classroom observation notes");
+    const now = new Date().toISOString();
+    const note: TeacherObservationNote = {
+      ...input,
+      id: crypto.randomUUID(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    return note;
+  }
+
+  async listTeacherObservationNotes(_teacherId?: string, _cycle?: PaorCycle, _activityId?: string): Promise<TeacherObservationNote[]> {
+    return [];
   }
 
   async appendLearningEvent(event: LearningEvent): Promise<LearningEvent> {

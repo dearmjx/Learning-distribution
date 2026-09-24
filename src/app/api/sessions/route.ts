@@ -3,7 +3,7 @@ import { buildAuthorshipIndicators } from "@/lib/analytics/authorship";
 import { generateCoachFeedback } from "@/lib/ai/coach";
 import { assertRequestedStudentMatchesContext, authErrorResponse, resolveLearningIdentity } from "@/lib/auth/supabase-identity";
 import { appendPersistedLearningEvent } from "@/lib/events/persistent-event";
-import { cerResponseSchema } from "@/lib/domain/schemas";
+import { cerResponseSchema, feedbackDecisionSchema } from "@/lib/domain/schemas";
 import type { AnalyzeSubmissionInput, CoachRequest } from "@/lib/domain/types";
 import { getLearningRepository } from "@/lib/repository/index";
 import { adiWorkflow } from "@/lib/workflow/adi-workflow";
@@ -16,6 +16,8 @@ const submissionSchema = z.object({
   hintDepth: z.enum(["none", "shallow", "concept", "deep"]).default("none"),
   responseTimeSeconds: z.number().int().min(0).max(86_400).default(0),
   requestId: z.string().min(1).max(256).optional(),
+  draft1Frozen: z.boolean().optional(),
+  feedbackDecisions: z.array(feedbackDecisionSchema).optional(),
 });
 
 export async function POST(request: Request) {
@@ -31,7 +33,12 @@ export async function POST(request: Request) {
     const studentId = identity.context.studentId!;
     const activity = await repository.getActivity(parsed.data.activityId);
     if (!activity) return Response.json({ error: "ไม่พบ activity หรือกิจกรรมไม่ได้ถูกมอบหมายให้ชั้นเรียนนี้" }, { status: 404 });
-    const approvedContext = approvedContextRepository.getApprovedContext(activity.courseId, activity.id);
+    const retrievalQuery = [
+      parsed.data.content.claim,
+      parsed.data.content.evidence,
+      parsed.data.content.reasoning,
+    ].filter(Boolean).join("\n");
+    const approvedContext = await approvedContextRepository.getApprovedContext(activity, retrievalQuery);
     if (!approvedContext) return Response.json({ error: "ไม่พบ approved context ของกิจกรรม" }, { status: 409 });
 
     const requestId = request.headers.get("Idempotency-Key") ?? parsed.data.requestId ?? crypto.randomUUID();
@@ -39,6 +46,10 @@ export async function POST(request: Request) {
     const previous = await repository.latestSubmission(studentId, input.activityId);
     const revisionCount = (await repository.listSubmissions(studentId, input.activityId)).length;
     const previousState = previous?.workflowState;
+    const isDraft1 = revisionCount === 0;
+    const isFrozen = Boolean(parsed.data.draft1Frozen || isDraft1);
+    const cycle = activity.cycle ?? 1;
+
     if (previous && previousState !== "revising" && previous.idempotencyKey !== requestId) {
       await repository.updateSubmissionWorkflow(previous.id, "revising");
       await appendPersistedLearningEvent(repository, {
@@ -49,9 +60,11 @@ export async function POST(request: Request) {
         context: identity.context,
         actor: { type: "student", id: studentId },
         idempotencyKey: `${requestId}:start-revision`,
+        cycle,
       });
     }
 
+    const now = new Date().toISOString();
     const submission = await repository.addSubmission({
       studentId,
       activityId: input.activityId,
@@ -61,6 +74,10 @@ export async function POST(request: Request) {
       hintCost: input.hintDepth === "none" ? 0 : input.hintDepth === "shallow" ? 1 : input.hintDepth === "concept" ? 2 : 3,
       responseTimeSeconds: input.responseTimeSeconds,
       workflowState: "submitted",
+      cycle,
+      draft1Frozen: isFrozen,
+      draft1FrozenAt: isFrozen ? now : undefined,
+      feedbackDecisions: parsed.data.feedbackDecisions,
       ...(previous ? { previousDraftId: previous.id } : {}),
       idempotencyKey: requestId,
     });
@@ -71,28 +88,79 @@ export async function POST(request: Request) {
       activityId: input.activityId,
       version: submission.version,
       content: input.content,
+      cycle,
+      feedbackDecisions: parsed.data.feedbackDecisions,
       idempotencyKey: `${requestId}:revision`,
     });
+
+    if (isDraft1 && isFrozen) {
+      await appendPersistedLearningEvent(repository, {
+        studentId,
+        activityId: input.activityId,
+        eventType: "draft_1_frozen",
+        payload: {
+          submissionId: submission.id,
+          version: 1,
+          frozenAt: now,
+          content: input.content,
+          cycle,
+        },
+        context: identity.context,
+        actor: { type: "student", id: studentId },
+        idempotencyKey: `${requestId}:draft1-freeze`,
+        cycle,
+      });
+    }
 
     await appendPersistedLearningEvent(repository, {
       studentId,
       activityId: input.activityId,
       eventType: previous ? "student_revised" : "student_submitted",
-      payload: { submissionId: submission.id, version: submission.version, hintDepth: input.hintDepth },
+      payload: {
+        submissionId: submission.id,
+        version: submission.version,
+        hintDepth: input.hintDepth,
+        draft1Frozen: isFrozen,
+        cycle,
+      },
       context: identity.context,
       actor: { type: "student", id: studentId },
       idempotencyKey: `${requestId}:submission-event`,
+      cycle,
     });
+
+    if (parsed.data.feedbackDecisions && parsed.data.feedbackDecisions.length > 0) {
+      await appendPersistedLearningEvent(repository, {
+        studentId,
+        activityId: input.activityId,
+        eventType: "feedback_evaluated",
+        payload: {
+          submissionId: submission.id,
+          version: submission.version,
+          decisions: parsed.data.feedbackDecisions,
+          decisionCount: parsed.data.feedbackDecisions.length,
+          acceptedCount: parsed.data.feedbackDecisions.filter((d) => d.status === "accept").length,
+          rejectedCount: parsed.data.feedbackDecisions.filter((d) => d.status === "reject").length,
+          modifiedCount: parsed.data.feedbackDecisions.filter((d) => d.status === "modify").length,
+          cycle,
+        },
+        context: identity.context,
+        actor: { type: "student", id: studentId },
+        idempotencyKey: `${requestId}:feedback-decisions`,
+        cycle,
+      });
+    }
 
     if (input.hintDepth !== "none") {
       await appendPersistedLearningEvent(repository, {
         studentId,
         activityId: input.activityId,
         eventType: "hint_requested",
-        payload: { submissionId: submission.id, hintDepth: input.hintDepth, hintCost: submission.hintCost },
+        payload: { submissionId: submission.id, hintDepth: input.hintDepth, hintCost: submission.hintCost, cycle },
         context: identity.context,
         actor: { type: "student", id: studentId },
         idempotencyKey: `${requestId}:hint`,
+        cycle,
       });
     }
 
@@ -110,7 +178,15 @@ export async function POST(request: Request) {
         events: await repository.listLearningEvents(studentId),
       });
     }
-    const feedback = existingInteraction?.response ?? await generateCoachFeedback(activity, { ...input, context: identity.context }, { context: identity.context, approvedContext: approvedContext.text });
+    const feedback = existingInteraction?.response ?? await generateCoachFeedback(
+      activity,
+      { ...input, context: identity.context },
+      {
+        context: identity.context,
+        approvedContext: approvedContext.text,
+        approvedCitations: approvedContext.citations,
+      },
+    );
     const feedbackTransition = adiWorkflow.transition(submission.workflowState, "feedback_received", {
       peerReviewAllowed: activity.peerReviewAllowed,
     });
@@ -122,7 +198,14 @@ export async function POST(request: Request) {
       studentId,
       activityId: input.activityId,
       eventType: "ai_feedback_received",
-      payload: { submissionId: submission.id, targetDimension: feedback.targetDimension, provider: feedback.provider, fallbackUsed: feedback.fallbackUsed },
+      payload: {
+        submissionId: submission.id,
+        targetDimension: feedback.targetDimension,
+        provider: feedback.provider,
+        fallbackUsed: feedback.fallbackUsed,
+        ragChunkIds: approvedContext.chunkIds,
+        citations: feedback.citations,
+      },
       context: identity.context,
       actor: { type: "system", id: "learning-os-coach" },
       idempotencyKey: `${requestId}:feedback`,

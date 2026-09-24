@@ -61,3 +61,15 @@ Support local OpenAI-compatible Ollama daemon (`http://localhost:11434/v1`) via 
 **Status:** accepted and verified
 
 Adopt 7 ADI learning phases (Orientation, Identification, Investigation, Argument, Peer Review, Revision, Reflection). Store phase reflections with structured dimensions (`conceptualLearning`, `inquiryProcessReflection`, `peerReviewExperience`, `confidenceScore`, `keyTakeaway`).
+
+## D-011 — Next milestone: real CAR pilot on Supabase
+
+**Status:** accepted (2026-09-25)
+
+The next "usable version" is a real classroom-action-research pilot with durable student data in Supabase cloud (one project per environment, RLS isolation). No pilot date is fixed; the full ticket list in `tickets/` is in scope, including the AI Opponent and pre/post analytics. Real student data is blocked until tickets LOS-003, LOS-004, LOS-005, LOS-006, LOS-007, and LOS-009 are done.
+
+## D-012 — Teacher rubric: CER and synthetic thinking scored separately
+
+**Status:** accepted (2026-09-25)
+
+Teachers rate CER (claim, evidence, reasoning; 1–4) and the four synthetic-thinking dimensions (selecting, connecting, reconstructing language, direct answering; 1–4) as two independent instruments. The system must not derive CER scores from synthetic-thinking scores. Tracked in LOS-007.

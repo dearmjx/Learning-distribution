@@ -1,6 +1,7 @@
-import type { AiInteraction, AuthorshipIndicators, LearningEvent, PeerReview, Revision, Submission, TeacherReview } from "@/lib/domain/types";
+import type { Activity, AiInteraction, AuthorshipIndicators, LearningEvent, PeerReview, Revision, Submission, TeacherReview } from "@/lib/domain/types";
 
 export interface TeacherReviewSnapshot {
+  activities: Activity[];
   submissions: Submission[];
   revisions: Revision[];
   interactions: AiInteraction[];

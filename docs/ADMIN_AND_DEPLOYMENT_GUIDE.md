@@ -278,6 +278,8 @@ All curriculum content, CER investigation prompts, approved contexts, and rubric
 ### 5.1 Adding or Modifying Activities
 To add a new activity or unit, open [`src/data/course/ecosystem/activities.ts`](file:///c:/Users/woram/OneDrive/Desktop/Hatairat/learn%20os/src/data/course/ecosystem/activities.ts):
 
+สำหรับการเพิ่ม knowledge chunks และการแยก RAG ตามบท ให้ทำตาม [`docs/CUSTOMIZE_RAG.md`](CUSTOMIZE_RAG.md) ด้วย โดย `chapterId` ของ activity ต้องตรงกับ `chapterId` ของ chunks
+
 ```typescript
 import type { Activity } from "@/lib/domain/types";
 
@@ -298,6 +300,7 @@ export const ecosystemActivities: Activity[] = [
     id: "ecosystem-carbon-cycle-01",
     courseId: "biology-m4",
     unit: "วัฏจักรสารในระบบนิเวศ",
+    chapterId: "carbon-cycle",
     title: "วิเคราะห์ผลกระทบของการตัดไม้ทำลายป่าต่อวัฏจักรคาร์บอน",
     adiPhase: "investigation",
     prompt: "การลดลงของพื้นที่ป่าไม้อย่างรวดเร็วจะส่งผลต่อปริมาณคาร์บอนไดออกไซด์ในบรรยากาศและอุณหภูมิเฉลี่ยของโลกอย่างไร?",
@@ -309,7 +312,7 @@ export const ecosystemActivities: Activity[] = [
 ```
 
 ### 5.2 Registering Approved Knowledge Context
-The AI Coach is strictly bound to approved instructional context. Ensure matching knowledge entries exist in [`src/lib/knowledge/approved-context.ts`](file:///c:/Users/woram/OneDrive/Desktop/Hatairat/learn%20os/src/lib/knowledge/approved-context.ts) to guarantee zero halluncinations.
+The AI Coach is strictly bound to approved instructional context. Add matching knowledge entries in [`src/data/course/ecosystem/knowledge-base.ts`](../src/data/course/ecosystem/knowledge-base.ts); the retrieval and scope checks are implemented in [`src/lib/knowledge/hybrid-rag.ts`](../src/lib/knowledge/hybrid-rag.ts). See [`docs/CUSTOMIZE_RAG.md`](CUSTOMIZE_RAG.md) for the complete example and verification steps.
 
 ---
 

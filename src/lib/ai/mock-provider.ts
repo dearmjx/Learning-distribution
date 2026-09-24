@@ -12,14 +12,16 @@ export class MockProvider implements LlmProvider {
     const startTime = performance.now();
     const userMessage = messages.findLast((message) => message.role === "user")?.content ?? "";
     const target = userMessage.includes("evidence") ? "evidence" : "reasoning";
+    const isOpponent = messages[0]?.content.includes("AI Opponent") ?? false;
 
     const content = JSON.stringify({
-      message:
-        target === "evidence"
-          ? "ลองเลือกหลักฐานจากข้อมูลสายใยอาหารในโจทย์ แล้วอธิบายว่าหลักฐานนั้นสนับสนุน claim ของคุณอย่างไร"
-          : "ลองเชื่อมโยง claim กับหลักฐานให้เห็นกลไกของการเปลี่ยนแปลงในระบบนิเวศ คุณคาดว่าประชากรใดจะเปลี่ยนก่อน เพราะอะไร",
+      message: isOpponent
+        ? "มีอีกคำอธิบายหนึ่งว่าการเปลี่ยนแปลงนี้อาจเกิดจากปัจจัยอื่นในระบบนิเวศ คุณจะใช้หลักฐานใดจากกิจกรรมมาแย้งคำอธิบายนี้ เพราะอะไร?"
+        : target === "evidence"
+          ? "ลองเลือกหลักฐานหนึ่งส่วนจากข้อมูลในกิจกรรม แล้วอธิบายว่าหลักฐานนั้นสนับสนุน claim ของคุณอย่างไร?"
+          : "ลองเชื่อมโยง claim กับหลักฐานให้เห็นกลไกของการเปลี่ยนแปลง คุณคาดว่าสิ่งใดจะเปลี่ยนก่อน เพราะอะไร?",
       targetDimension: target,
-      citations: ["เนื้อหากิจกรรม: สายใยอาหารและการถ่ายทอดพลังงาน"],
+      citations: ["บริบทกิจกรรมที่ครูอนุมัติ"],
     });
 
     const elapsedMs = Math.max(1, Math.round(performance.now() - startTime));

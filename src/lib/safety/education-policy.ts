@@ -33,8 +33,8 @@ export function evaluateCoachRequest(request: CoachRequest): EducationSafetyResu
   if (request.context.activityId !== request.activity.id) {
     violations.push({ rule: "approved_context_only", message: "Activity scope does not match the Coach request" });
   }
-  if (!request.approvedContext.trim() || request.approvedContext !== request.activity.context) {
-    violations.push({ rule: "approved_context_only", message: "Coach context must come from the approved activity context" });
+  if (!request.approvedContext.trim() || !request.approvedContext.includes(request.activity.context)) {
+    violations.push({ rule: "approved_context_only", message: "Coach context must include the approved activity context" });
   }
   if (request.currentAdiPhase !== request.activity.adiPhase) {
     violations.push({ rule: "approved_context_only", message: "ADI phase does not match the activity phase" });
@@ -42,9 +42,28 @@ export function evaluateCoachRequest(request: CoachRequest): EducationSafetyResu
   return { allowed: violations.length === 0, violations };
 }
 
+export function validateStrictSocraticResponse(message: string): boolean {
+  const normalized = message.trim();
+  if (!normalized) return false;
+  // 1. Must not be excessively long (exceeding ~150-200 words / 800 chars) to prevent writing the student's assignment
+  if (normalized.length > 850) return false;
+
+  // 2. Must not contain direct answer declarative conclusions
+  const declarativeConclusions = [
+    "สรุปได้ว่าคำตอบคือ",
+    "คำตอบที่ถูกต้องคือ",
+    "ข้อสรุปที่สมบูรณ์คือ",
+    "คำตอบของข้อนี้คือ",
+    "ดังนั้นคำตอบจึงเป็น",
+  ];
+  if (declarativeConclusions.some((phrase) => normalized.includes(phrase))) return false;
+
+  // 3. Must contain question/inquiry markers
+  return questionMarkers.some((marker) => normalized.toLowerCase().includes(marker));
+}
+
 export function isSocraticMessage(message: string): boolean {
-  const normalized = message.trim().toLowerCase();
-  return questionMarkers.some((marker) => normalized.includes(marker));
+  return validateStrictSocraticResponse(message);
 }
 
 export function fallbackCoachResponse(request: CoachRequest, reason: string): CoachResponse {
@@ -53,11 +72,15 @@ export function fallbackCoachResponse(request: CoachRequest, reason: string): Co
     claim: "ลองตั้ง claim ของคุณเองจากบริบทที่ครูอนุมัติ: คุณคาดว่าจะเกิดการเปลี่ยนแปลงอะไร และเพราะอะไร?",
     evidence: "ลองเลือกหลักฐานหนึ่งส่วนจากบริบทกิจกรรม แล้วถามตัวเองว่าหลักฐานนั้นสนับสนุน claim อย่างไร?",
     reasoning: "ลองอธิบายกลไกที่เชื่อมหลักฐานกับ claim ของคุณ: สิ่งหนึ่งนำไปสู่อีกสิ่งหนึ่งได้อย่างไร?",
+    selecting_info: "ลองเลือกสรรข้อมูลและตัวเลขที่เกี่ยวข้องโดยตรงจากสถานการณ์และตารางใน Phase 3 ดูสิครับว่ามีส่วนใดสนับสนุนข้อสรุปบ้าง?",
+    connecting_info: "ลองอธิบายกลไกหรือความสัมพันธ์เชิงเหตุผลว่าเหตุการณ์หนึ่งส่งผลต่ออีกเหตุการณ์หนึ่งอย่างไร โดยอ้างอิงข้อมูลในบทเรียน?",
+    reconstructing_language: "ลองเรียบเรียงและสังเคราะห์คำอธิบายใหม่ด้วยภาษาและความเข้าใจของตนเอง โดยไม่คัดลอกข้อความตรงๆ ได้อย่างไร?",
+    direct_answering: "ลองตรวจสอบดูว่าข้อสรุปและเหตุผลของคุณตอบตรงประเด็นและสมเหตุสมผลตามคำถามนำการสืบเสาะหรือไม่?",
   };
   return {
     requestId: request.requestId,
     provider: "fallback",
-    message: prompts[targetDimension],
+    message: prompts[targetDimension] ?? prompts.reasoning,
     targetDimension,
     hintDepth: request.hintDepth,
     hintCost: request.hintDepth === "none" ? 0 : request.hintDepth === "shallow" ? 1 : request.hintDepth === "concept" ? 2 : 3,

@@ -4,10 +4,12 @@ import { assertRequestedStudentMatchesContext, authErrorResponse, resolveLearnin
 import { appendPersistedLearningEvent } from "@/lib/events/persistent-event";
 import { approvedContextRepository } from "@/lib/knowledge/approved-context";
 import { getLearningRepository } from "@/lib/repository/index";
+import { checkRateLimit, coachRateLimitPerMinute, rateLimitedResponse } from "@/lib/safety/rate-limit";
 
 const chatRequestSchema = z.object({
   studentId: z.string().min(1).optional(),
   activityId: z.string().min(1),
+  mode: z.enum(["coach", "opponent"]).default("coach"),
   message: z.string().min(1).max(2000),
   studentCer: z
     .object({
@@ -38,7 +40,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { studentId: requestedStudentId, activityId, message, studentCer, history } = parsed.data;
+    const { studentId: requestedStudentId, activityId, mode, message, studentCer, history } = parsed.data;
+    const eventMode = mode === "opponent" ? "opponent_challenge" : "socratic_chat";
     const identity = await resolveLearningIdentity({ activityId, requiredRole: "student" });
     assertRequestedStudentMatchesContext(identity.context, requestedStudentId);
     const repository = await getLearningRepository(identity);
@@ -47,7 +50,25 @@ export async function POST(request: Request) {
       return Response.json({ error: "ไม่พบกิจกรรม" }, { status: 404 });
     }
 
-    const approvedDoc = approvedContextRepository.getApprovedContext(activity.courseId, activity.id);
+    // Draft-first research gate: the Coach unlocks only after a Draft 1 baseline exists.
+    const baseline = await repository.latestSubmission(identity.context.studentId!, activityId);
+    if (!baseline) {
+      return Response.json(
+        { error: "กรุณาส่ง Draft 1 (Freeze Baseline) ก่อนเริ่มคุยกับ AI Coach", code: "draft1_required" },
+        { status: 409 },
+      );
+    }
+
+    const limit = checkRateLimit(`coach-chat:${identity.context.studentId}`, coachRateLimitPerMinute());
+    if (!limit.allowed) return rateLimitedResponse(limit.retryAfterSeconds);
+
+    const retrievalQuery = [
+      message,
+      studentCer?.claim,
+      studentCer?.evidence,
+      studentCer?.reasoning,
+    ].filter(Boolean).join("\n");
+    const approvedDoc = await approvedContextRepository.getApprovedContext(activity, retrievalQuery);
     const approvedContext = approvedDoc?.text ?? activity.context;
 
     const context = identity.context;
@@ -61,15 +82,17 @@ export async function POST(request: Request) {
       payload: {
         chatMessage: message,
         hintDepth: "deep",
-        mode: "socratic_chat",
+        mode: eventMode,
       },
       context,
       actor: { type: "student", id: studentId },
     });
 
     const result = await chatWithCoach({
+      mode,
       activity,
       approvedContext,
+      approvedCitations: approvedDoc?.citations,
       studentCer,
       message,
       history,
@@ -82,8 +105,13 @@ export async function POST(request: Request) {
       eventType: "ai_feedback_received",
       payload: {
         coachReply: result.message,
+        mode: eventMode,
+        guardrailReplaced: result.guardrailReplaced,
         provider: result.provider,
+        ...(typeof result.telemetry?.totalTokens === "number" ? { totalTokens: result.telemetry.totalTokens } : {}),
         fallbackUsed: result.fallbackUsed,
+        ragChunkIds: approvedDoc?.chunkIds ?? [],
+        citations: result.citations,
       },
       context,
       actor: { type: "system", id: "socratic-coach" },

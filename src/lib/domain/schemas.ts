@@ -9,7 +9,42 @@ import type {
   PeerReviewSubmission,
   StudentReflectionData,
   AdiWizardState,
+  FeedbackDecision,
+  SyntheticThinkingRubricScores,
+  TeacherObservationNote,
 } from "@/lib/domain/types";
+
+export const paorCycleSchema = z.union([z.literal(1), z.literal(2)]);
+
+export const feedbackDecisionSchema = z.object({
+  id: z.string().optional(),
+  interactionId: z.string().optional(),
+  feedbackItem: z.string().min(1).max(4000),
+  source: z.enum(["ai_coach", "peer", "system"]).default("ai_coach"),
+  status: z.enum(["accept", "reject", "modify"]),
+  justificationText: z.string().min(1).max(4000),
+  createdAt: z.string().optional(),
+});
+
+export const syntheticThinkingRubricSchema = z.object({
+  selectingInfo: z.number().int().min(1).max(4),
+  connectingInfo: z.number().int().min(1).max(4),
+  reconstructingLanguage: z.number().int().min(1).max(4),
+  directAnswering: z.number().int().min(1).max(4),
+});
+
+export const teacherObservationNoteSchema = z.object({
+  id: z.string().optional(),
+  /** Ignored by API routes; teacher and class come from the server identity. */
+  teacherId: z.string().min(1).optional(),
+  classId: z.string().min(1).optional(),
+  cycle: paorCycleSchema,
+  activityId: z.string().min(1),
+  phase: z.enum(["plan", "act", "observe", "reflect"]),
+  content: z.string().min(1).max(12_000),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
 
 export const adiPhaseSchema = z.enum([
   "orientation",
@@ -151,6 +186,7 @@ export const learningContextSchema = z.object({
   activityId: z.string().min(1).max(128).optional(),
   studentId: z.string().min(1).max(128).optional(),
   teacherId: z.string().min(1).max(128).optional(),
+  cycle: paorCycleSchema.optional(),
   adiPhase: adiPhaseSchema,
   role: z.enum(["student", "teacher", "system", "researcher"]),
   language: z.enum(["th", "en"]),
@@ -163,12 +199,24 @@ export const activitySchema = z.object({
   id: z.string().min(1),
   courseId: z.string().min(1),
   unit: z.string().min(1),
+  chapterId: z.string().min(1).max(128).optional(),
   title: z.string().min(1),
   adiPhase: adiPhaseSchema,
   prompt: z.string().min(1),
   context: z.string().min(1),
-  rubricDimensions: z.array(z.enum(["claim", "evidence", "reasoning"])).min(1),
+  rubricDimensions: z.array(
+    z.enum([
+      "claim",
+      "evidence",
+      "reasoning",
+      "selecting_info",
+      "connecting_info",
+      "reconstructing_language",
+      "direct_answering",
+    ]),
+  ).min(1),
   peerReviewAllowed: z.boolean(),
+  cycle: paorCycleSchema.optional(),
 });
 
 export const coachRequestSchema = z.object({
@@ -185,7 +233,15 @@ export const coachResponseSchema = z.object({
   requestId: z.string().min(1).max(128),
   provider: z.enum(["mock", "local", "deepseek", "fallback"]),
   message: z.string().min(1).max(4_000),
-  targetDimension: z.enum(["claim", "evidence", "reasoning"]),
+  targetDimension: z.enum([
+    "claim",
+    "evidence",
+    "reasoning",
+    "selecting_info",
+    "connecting_info",
+    "reconstructing_language",
+    "direct_answering",
+  ]),
   hintDepth: z.enum(["none", "shallow", "concept", "deep"]),
   hintCost: z.number().int().nonnegative(),
   citations: z.array(z.string().max(512)).max(16),
@@ -220,12 +276,15 @@ export const learningEventSchema = z.object({
     "activity_selected",
     "context_viewed",
     "student_submitted",
+    "draft_1_frozen",
     "ai_feedback_received",
     "hint_requested",
     "student_revised",
     "peer_review_assigned",
     "peer_review_submitted",
+    "feedback_evaluated",
     "teacher_reviewed",
+    "teacher_observation_recorded",
     "reflection_completed",
     "learning_phase_changed",
     "authorship_indicator_created",
@@ -235,6 +294,7 @@ export const learningEventSchema = z.object({
   occurredAt: z.string().datetime(),
   createdAt: z.string().datetime(),
   idempotencyKey: z.string().min(1).max(256).optional(),
+  cycle: paorCycleSchema.optional(),
 });
 
 export function parseLearningContext(value: unknown): LearningContext {
@@ -271,4 +331,16 @@ export function parseStudentReflectionData(value: unknown): StudentReflectionDat
 
 export function parseAdiWizardState(value: unknown): AdiWizardState {
   return adiWizardStateSchema.parse(value);
+}
+
+export function parseFeedbackDecision(value: unknown): FeedbackDecision {
+  return feedbackDecisionSchema.parse(value);
+}
+
+export function parseSyntheticThinkingRubric(value: unknown): SyntheticThinkingRubricScores {
+  return syntheticThinkingRubricSchema.parse(value);
+}
+
+export function parseTeacherObservationNote(value: unknown): z.infer<typeof teacherObservationNoteSchema> {
+  return teacherObservationNoteSchema.parse(value);
 }

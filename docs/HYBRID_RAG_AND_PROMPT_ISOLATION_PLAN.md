@@ -75,8 +75,9 @@ Each knowledge entry contains three essential pedagogical layers:
 
 ## 5. Next Steps & Verification
 
-Once approved, we will:
-1. Populate `src/data/course/ecosystem/knowledge-base.ts` with comprehensive ม.4 Ecosystem knowledge chunks.
-2. Implement the Hybrid RAG engine in `src/lib/knowledge/hybrid-rag.ts`.
-3. Implement the Two-Pass decoupled Socratic Coach in `src/lib/ai/coach.ts` with strict XML prompt templates.
-4. Execute automated unit tests for Thai tokenization, BM25 retrieval, and adversarial prompt injection defenses.
+Implementation status for this MVP:
+1. `src/data/course/ecosystem/knowledge-base.ts` stores teacher-approved, chapter-scoped knowledge chunks.
+2. `src/lib/knowledge/hybrid-rag.ts` provides Thai-aware BM25 retrieval and an optional dense-retriever port fused with RRF.
+3. `src/lib/knowledge/approved-context.ts` combines the activity baseline with scoped retrieved chunks before calling the Coach.
+4. `/api/sessions` and `/api/coach/chat` pass the student's question/CER as a retrieval query; raw student text is not inserted into the approved corpus.
+5. See [`docs/CUSTOMIZE_RAG.md`](CUSTOMIZE_RAG.md) for adding another chapter or course. A production vector adapter and DB-backed knowledge repository can be added behind the existing ports.

@@ -1,4 +1,4 @@
-import type { LearningContext, LearningEvent, LearningEventActor, LearningEventType } from "@/lib/domain/types";
+import type { LearningContext, LearningEvent, LearningEventActor, LearningEventType, PaorCycle } from "@/lib/domain/types";
 import { createLearningEvent } from "@/lib/events/event-store";
 import type { ScopedLearningRepository } from "@/lib/repository/interfaces";
 
@@ -13,6 +13,7 @@ export async function appendPersistedLearningEvent(
     actor: LearningEventActor;
     correlationId?: string;
     idempotencyKey?: string;
+    cycle?: PaorCycle;
   },
 ): Promise<LearningEvent> {
   const event = createLearningEvent({
@@ -25,6 +26,7 @@ export async function appendPersistedLearningEvent(
     actor: input.actor,
     correlationId: input.correlationId ?? input.context.correlationId,
     ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+    ...(input.cycle ? { cycle: input.cycle } : {}),
   });
   return repository.appendLearningEvent(event);
 }

@@ -468,3 +468,45 @@ Verification evidence:
 
 Exact next step: Phase 10 security & caching hardening (rate limiting on `/api/coach/chat`, `/api/ready` probe, and deployment checklist).
 
+
+## Phase 11 repair, audit tickets, and M1 scoping — 2026-09-25
+
+Status: Phase 11 research-hardening code now compiles and passes all checks. Work is still uncommitted on `main` (see LOS-010).
+
+Fixes:
+- `src/components/teacher-review-dashboard.tsx`: fixed a JSX fragment that closed early, replaced the missing `analytics.averageScore` with an average computed from reviews, and removed stray LaTeX from the rubric label.
+- `src/lib/events/persistent-event.ts`: now accepts and forwards `cycle`.
+- `src/lib/repository/index.ts`: the memory scoped repo implements the observation-note methods, with teacher and class IDs forced from the server identity.
+- `src/lib/domain/schemas.ts`: fixed the `parseTeacherObservationNote` return type.
+- `src/app/api/coach/chat/route.ts`: the server now rejects chat requests with 409 `draft1_required` until a Draft 1 exists (audit must-fix #1).
+- New test: `src/lib/coach-chat-gate.test.ts`.
+
+Verification (this task): `npm run typecheck` 0 errors · `npm test` 14 files / 45 tests passed · `npm run build` passed (23 routes) after all edits.
+
+Ticket system: `tickets/README.md` (LOS-001 to LOS-012). Decisions D-011 (the next milestone is a real CAR pilot on Supabase, no date) and D-012 (score CER and synthetic thinking separately) are in `docs/DECISIONS.md`.
+
+Known blockers for real student data: Supabase drops the Phase 11 fields (LOS-003), observation notes are a stub in Supabase (LOS-004), the UI hardcodes IDs and the cycle heuristic (LOS-005, LOS-006), and live verification hasn't been done (LOS-009).
+
+Exact next step: LOS-010 (branch and commit), then LOS-003.
+
+## Non-Supabase tickets closed — 2026-09-25 (later)
+
+The user will test Supabase on 2026-09-26, so LOS-003, LOS-004 and LOS-009 are deliberately untouched. Closed: LOS-005, 006, 007, 008, 011, 012, and the new LOS-013 (the chat guardrail wasn't enforced). Details are in `tickets/`.
+
+Files changed: `src/components/teacher-review-dashboard.tsx`, `src/components/socratic-coach-chat.tsx`, `src/components/teacher-analytics.tsx`, `src/components/growth-analytics-panel.tsx` (new), `src/lib/research/export.ts`, `src/lib/research/growth.ts` (new), `src/lib/safety/rate-limit.ts` (new), `src/lib/ai/coach.ts`, `src/lib/ai/mock-provider.ts`, `src/lib/education/teacher-review.ts`, `src/lib/domain/schemas.ts`, `src/lib/teacher/review-types.ts`, `src/app/api/coach/chat/route.ts`, `src/app/api/teacher/reviews/route.ts`, `src/app/api/teacher/observations/route.ts`, `src/app/api/research/export/route.ts`, `src/app/api/ready/route.ts` (new), `src/middleware.ts`, `.claude/launch.json` (new; dev on port 3100). New tests: `src/lib/research-integrity.test.ts`, `src/lib/growth.test.ts`, plus additions to `coach-chat.test.ts` and `coach-chat-gate.test.ts`.
+
+Verification: `npm run typecheck` 0 errors · `npm test` 16 files / 59 tests passed · `npm run build` passed (24 routes). Browser check on the dev server (memory mode, Ollama not running, so replies used the fallback provider):
+- The Draft-1 gate returned 409.
+- Opponent chat returned a challenge question.
+- `/api/ready` returned 503 with "local LLM unreachable", which is correct.
+- A teacher review saved through the UI stored CER and the 4 dimensions separately, with teacherId set by the server.
+- An observation note's teacherId and classId came from the server identity.
+- The growth panel showed a paired Cycle 1 of 50 → Cycle 2 of 100.
+
+Known dev-only quirk: in `next dev`, the first compile of a new route can reset the in-memory store. Memory mode isn't durable and isn't approved for real data.
+
+For the Supabase test tomorrow (LOS-003):
+- Persist `cycle`, `draft1Frozen`/`draft1FrozenAt` and `feedbackDecisions` on submissions and revisions.
+- Persist `syntheticScores` and `cycle` on teacher reviews.
+- LOS-004: persist observation notes.
+- LOS-005 remainder: the roster route and the student picker should use real memberships.

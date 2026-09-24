@@ -4,13 +4,14 @@ import type { AuthorshipIndicators, LearningEvent } from "@/lib/domain/types";
 import { getLearningRepository } from "@/lib/repository/index";
 import type { TeacherReviewSnapshot } from "@/lib/teacher/review-types";
 
-async function snapshot(repository: Awaited<ReturnType<typeof getLearningRepository>>): Promise<TeacherReviewSnapshot> {
+async function snapshot(repository: Awaited<ReturnType<typeof getLearningRepository>>, courseId: string): Promise<TeacherReviewSnapshot> {
   const submissions = await repository.listSubmissions();
   const revisions = (await Promise.all(submissions.map((submission) => repository.listRevisions(submission.id)))).flat();
   const interactions = (await Promise.all(submissions.map((submission) => repository.listInteractions(submission.studentId, submission.activityId)))).flat();
   const peerReviews = (await Promise.all(submissions.map((submission) => repository.listPeerReviews(submission.id)))).flat();
   const reviews = (await Promise.all(submissions.map((submission) => repository.listTeacherReviews(submission.id)))).flat();
   const events = await repository.listLearningEvents();
+  const activities = await repository.listActivities(courseId);
   const authorshipBySubmission: Record<string, AuthorshipIndicators | undefined> = {};
   for (const event of events) {
     if (event.eventType !== "authorship_indicator_created") continue;
@@ -20,6 +21,7 @@ async function snapshot(repository: Awaited<ReturnType<typeof getLearningReposit
     authorshipBySubmission[submissionId] = indicators as unknown as AuthorshipIndicators;
   }
   return {
+    activities,
     submissions,
     revisions,
     interactions,
@@ -42,7 +44,7 @@ export async function GET(request: Request) {
   try {
     const identity = await resolveLearningIdentity({ requiredRole: "teacher" });
     const repository = await getLearningRepository(identity);
-    return Response.json(await snapshot(repository), {
+    return Response.json(await snapshot(repository, identity.context.courseId), {
       headers: {
         "Cache-Control": "no-store, private",
       },
@@ -62,11 +64,8 @@ export async function POST(request: Request) {
     if (!submission) return Response.json({ error: "ไม่พบ submission ใน class scope ของครู" }, { status: 404 });
     const activity = await repository.getActivity(submission.activityId);
     if (!activity) return Response.json({ error: "ไม่พบ activity" }, { status: 404 });
-    const review = await recordTeacherReviewWithRepository(identity.context, {
-      ...parsed.data,
-      teacherId: identity.context.teacherId ?? "",
-    }, repository);
-    return Response.json({ review, snapshot: await snapshot(repository) }, {
+    const review = await recordTeacherReviewWithRepository(identity.context, parsed.data, repository);
+    return Response.json({ review, snapshot: await snapshot(repository, identity.context.courseId) }, {
       headers: {
         "Cache-Control": "no-store, private",
       },

@@ -110,6 +110,37 @@ export interface AdiWizardState {
   reflectionData?: StudentReflectionData;
 }
 
+export type PaorCycle = 1 | 2;
+
+export interface FeedbackDecision {
+  id?: string;
+  interactionId?: string;
+  feedbackItem: string;
+  source: "ai_coach" | "peer" | "system";
+  status: "accept" | "reject" | "modify";
+  justificationText: string;
+  createdAt?: string;
+}
+
+export interface SyntheticThinkingRubricScores {
+  selectingInfo: number; // 1-4 (การเลือกสรรข้อมูลที่เกี่ยวข้อง)
+  connectingInfo: number; // 1-4 (การเชื่อมโยงความสัมพันธ์ของข้อมูล)
+  reconstructingLanguage: number; // 1-4 (การสังเคราะห์/จัดโครงสร้างใหม่ด้วยภาษาตนเอง)
+  directAnswering: number; // 1-4 (การตอบตรงประเด็นและสมเหตุสมผล)
+}
+
+export interface TeacherObservationNote {
+  id: string;
+  teacherId: string;
+  classId: string;
+  cycle: PaorCycle;
+  activityId: string;
+  phase: "plan" | "act" | "observe" | "reflect";
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface LearningContext {
   schoolId: string;
   courseId: string;
@@ -117,6 +148,7 @@ export interface LearningContext {
   activityId?: string;
   studentId?: string;
   teacherId?: string;
+  cycle?: PaorCycle;
   adiPhase: AdiPhase;
   role: LearningRole;
   language: LearningLanguage;
@@ -128,18 +160,28 @@ export interface LearningContext {
 export type HintDepth = "none" | "shallow" | "concept" | "deep";
 export type AuthorshipStatus = "none" | "observe" | "teacher_review";
 
-export type RubricDimension = "claim" | "evidence" | "reasoning";
+export type RubricDimension =
+  | "claim"
+  | "evidence"
+  | "reasoning"
+  | "selecting_info"
+  | "connecting_info"
+  | "reconstructing_language"
+  | "direct_answering";
 
 export interface Activity {
   id: string;
   courseId: string;
   unit: string;
+  /** Stable key used to isolate RAG retrieval to one chapter. */
+  chapterId?: string;
   title: string;
   adiPhase: AdiPhase;
   prompt: string;
   context: string;
   rubricDimensions: RubricDimension[];
   peerReviewAllowed: boolean;
+  cycle?: PaorCycle;
 }
 
 export interface Course {
@@ -178,6 +220,10 @@ export interface Submission {
   workflowState: AdiWorkflowState;
   previousDraftId?: string;
   idempotencyKey?: string;
+  cycle?: PaorCycle;
+  draft1Frozen?: boolean;
+  draft1FrozenAt?: string;
+  feedbackDecisions?: FeedbackDecision[];
 }
 
 export interface Revision {
@@ -189,6 +235,8 @@ export interface Revision {
   content: CerResponse;
   createdAt: string;
   idempotencyKey?: string;
+  cycle?: PaorCycle;
+  feedbackDecisions?: FeedbackDecision[];
 }
 
 export interface AiSession {
@@ -222,9 +270,15 @@ export interface PeerReview {
 }
 
 export interface TeacherReviewRubricScores {
+  // Generic CER
   claim?: number;
   evidence?: number;
   reasoning?: number;
+  // 4 Dimensions of Synthetic Thinking (CAR standard)
+  selectingInfo?: number; // 1-4
+  connectingInfo?: number; // 1-4
+  reconstructingLanguage?: number; // 1-4
+  directAnswering?: number; // 1-4
 }
 
 export interface TeacherReview {
@@ -234,7 +288,9 @@ export interface TeacherReview {
   score: number;
   comment: string;
   rubricScores?: TeacherReviewRubricScores;
+  syntheticScores?: SyntheticThinkingRubricScores;
   createdAt: string;
+  cycle?: PaorCycle;
 }
 
 export interface AuthorshipIndicators {
@@ -277,12 +333,15 @@ export type LearningEventType =
   | "activity_selected"
   | "context_viewed"
   | "student_submitted"
+  | "draft_1_frozen"
   | "ai_feedback_received"
   | "hint_requested"
   | "student_revised"
   | "peer_review_assigned"
   | "peer_review_submitted"
+  | "feedback_evaluated"
   | "teacher_reviewed"
+  | "teacher_observation_recorded"
   | "reflection_completed"
   | "learning_phase_changed"
   | "authorship_indicator_created";
@@ -305,6 +364,7 @@ export interface LearningEvent {
   occurredAt: string;
   createdAt: string;
   idempotencyKey?: string;
+  cycle?: PaorCycle;
 }
 
 export interface AnalyzeSubmissionInput {
@@ -315,6 +375,8 @@ export interface AnalyzeSubmissionInput {
   responseTimeSeconds: number;
   requestId?: string;
   context?: LearningContext;
+  draft1Frozen?: boolean;
+  feedbackDecisions?: FeedbackDecision[];
 }
 
 export interface RosterStudentProgress {
@@ -329,6 +391,7 @@ export interface RosterStudentProgress {
   peerReviewCompleted: boolean;
   teacherScore?: number;
   lastActiveAt: string;
+  cycle?: PaorCycle;
 }
 
 export interface ClassRosterSummary {
@@ -338,5 +401,5 @@ export interface ClassRosterSummary {
   totalStudents: number;
   activeActivityId: string;
   students: RosterStudentProgress[];
+  cycle?: PaorCycle;
 }
-

@@ -8,21 +8,36 @@ import { adiWorkflow } from "@/lib/workflow/adi-workflow";
 
 export const teacherReviewInputSchema = z.object({
   submissionId: z.string().min(1),
-  teacherId: z.string().min(1),
+  /** Ignored by API routes; the server derives the teacher from the session. */
+  teacherId: z.string().min(1).optional(),
   score: z.number().min(0).max(100),
   comment: z.string().max(4_000),
-  rubricScores: z.object({
-    claim: z.number().min(0).max(4).optional(),
-    evidence: z.number().min(0).max(4).optional(),
-    reasoning: z.number().min(0).max(4).optional(),
-  }).optional(),
+  rubricScores: z
+    .object({
+      claim: z.number().min(0).max(4).optional(),
+      evidence: z.number().min(0).max(4).optional(),
+      reasoning: z.number().min(0).max(4).optional(),
+      selectingInfo: z.number().min(0).max(4).optional(),
+      connectingInfo: z.number().min(0).max(4).optional(),
+      reconstructingLanguage: z.number().min(0).max(4).optional(),
+      directAnswering: z.number().min(0).max(4).optional(),
+    })
+    .optional(),
+  syntheticScores: z
+    .object({
+      selectingInfo: z.number().int().min(1).max(4),
+      connectingInfo: z.number().int().min(1).max(4),
+      reconstructingLanguage: z.number().int().min(1).max(4),
+      directAnswering: z.number().int().min(1).max(4),
+    })
+    .optional(),
 });
 
 export function recordTeacherReview(
   context: LearningContext,
   input: z.infer<typeof teacherReviewInputSchema>,
 ): TeacherReview {
-  if (context.role !== "teacher" || context.teacherId !== input.teacherId) {
+  if (context.role !== "teacher" || !context.teacherId || (input.teacherId && context.teacherId !== input.teacherId)) {
     throw new Error("Only the scoped teacher may record a final review");
   }
   const submission = getSubmission(input.submissionId);
@@ -38,7 +53,10 @@ export function recordTeacherReview(
   submission.workflowState = completed.newState;
   const review = addTeacherReview({
     ...input,
+    teacherId: context.teacherId,
     rubricScores: input.rubricScores,
+    syntheticScores: input.syntheticScores,
+    cycle: submission.cycle,
   });
   const eventContext: LearningContext = { ...context, activityId: submission.activityId, studentId: submission.studentId };
   appendLearningEvent({
@@ -51,9 +69,10 @@ export function recordTeacherReview(
       score: review.score,
       comment: review.comment,
       rubricScores: review.rubricScores,
+      syntheticScores: review.syntheticScores,
     },
     context: eventContext,
-    actor: { type: "teacher", id: input.teacherId },
+    actor: { type: "teacher", id: context.teacherId },
   });
   appendLearningEvent({
     studentId: submission.studentId,
@@ -61,7 +80,7 @@ export function recordTeacherReview(
     eventType: "learning_phase_changed",
     payload: { submissionId: submission.id, from: toTeacherReview.previousState, to: completed.newState, action: "complete" },
     context: eventContext,
-    actor: { type: "teacher", id: input.teacherId },
+    actor: { type: "teacher", id: context.teacherId },
   });
   return review;
 }
@@ -93,6 +112,8 @@ export async function recordTeacherReviewWithRepository(
     score: input.score,
     comment: input.comment,
     rubricScores: input.rubricScores,
+    syntheticScores: input.syntheticScores,
+    cycle: submission.cycle,
   });
   const eventContext: LearningContext = { ...context, activityId: submission.activityId, studentId: submission.studentId };
   const eventKey = `teacher-review:${review.id}`;
@@ -106,6 +127,7 @@ export async function recordTeacherReviewWithRepository(
       score: review.score,
       comment: review.comment,
       rubricScores: review.rubricScores,
+      syntheticScores: review.syntheticScores,
     },
     context: eventContext,
     actor: { type: "teacher", id: context.teacherId },

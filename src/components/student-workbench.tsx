@@ -22,9 +22,15 @@ interface StudentWorkbenchProps {
 export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = {}) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activityId, setActivityId] = useState("");
-  const [studentId, setStudentId] = useState("demo-student-01");
+  const [classId, setClassId] = useState("biology-m4-class-a");
+  const [studentId, setStudentId] = useState("40101");
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([1]);
+
+  // Generate 57 student IDs for the 2 classrooms
+  const classAStudents = useMemo(() => Array.from({ length: 29 }, (_, i) => `401${String(i + 1).padStart(2, "0")}`), []);
+  const classBStudents = useMemo(() => Array.from({ length: 28 }, (_, i) => `402${String(i + 1).padStart(2, "0")}`), []);
+  const activeStudentList = useMemo(() => classId === "biology-m4-class-b" ? classBStudents : classAStudents, [classId, classAStudents, classBStudents]);
 
   // State across phases
   const [variablesData, setVariablesData] = useState<Record<string, string>>({});
@@ -33,18 +39,32 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
   const [, setRevisedSubmission] = useState<Submission | null>(null);
   const [error, setError] = useState("");
 
-  // Load saved student ID from localStorage if available
+  // Load saved student ID and classroom from localStorage if available
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("learning_os_student_id");
-      if (saved) setStudentId(saved);
+      const savedClass = localStorage.getItem("learning_os_class_id");
+      if (savedClass) setClassId(savedClass);
+      const savedStudent = localStorage.getItem("learning_os_student_id");
+      if (savedStudent) setStudentId(savedStudent);
     } catch {
       // ignore
     }
   }, []);
 
+  function handleClassIdChange(val: string) {
+    setClassId(val);
+    const defaultStudent = val === "biology-m4-class-b" ? "40201" : "40101";
+    setStudentId(defaultStudent);
+    try {
+      localStorage.setItem("learning_os_class_id", val);
+      localStorage.setItem("learning_os_student_id", defaultStudent);
+    } catch {
+      // ignore
+    }
+  }
+
   function handleStudentIdChange(val: string) {
-    const cleaned = val.trim() || "demo-student-01";
+    const cleaned = val.trim() || "40101";
     setStudentId(val);
     try {
       localStorage.setItem("learning_os_student_id", cleaned);
@@ -97,7 +117,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
         <div className="hero-brand">
           <div className="brand-badge">
             <span className="brand-dot" />
-            <span>LEARNING OS · BIOLOGY M.4</span>
+            <span>LEARNING OS · CAR RESEARCH ENVIRONMENT (ม.4)</span>
           </div>
           <h1>7-Phase ADI Inquiry Hub</h1>
           <p className="lede">
@@ -106,22 +126,39 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
         </div>
 
         <div className="hero-actions">
-          {/* Student ID / Number Input */}
+          {/* Classroom Selector */}
           <div className="student-id-selector-box">
-            <label htmlFor="student-id-input">🧑‍🎓 เลขที่ / รหัสนักเรียน:</label>
-            <input
-              id="student-id-input"
-              type="text"
-              className="student-id-input"
+            <label htmlFor="class-select">🏫 ห้องเรียน:</label>
+            <select
+              id="class-select"
+              className="form-select"
+              value={classId}
+              onChange={(e) => handleClassIdChange(e.target.value)}
+            >
+              <option value="biology-m4-class-a">ม.4/1 (29 คน)</option>
+              <option value="biology-m4-class-b">ม.4/2 (28 คน)</option>
+            </select>
+          </div>
+
+          {/* Student ID Roster Selector & Input */}
+          <div className="student-id-selector-box">
+            <label htmlFor="student-id-select">🧑‍🎓 รหัสนักเรียน:</label>
+            <select
+              id="student-id-select"
+              className="form-select"
               value={studentId}
               onChange={(e) => handleStudentIdChange(e.target.value)}
-              placeholder="เช่น demo-student-01 หรือ 15"
-              title="ระบุเลขที่หรือรหัสประจำตัวนักเรียนของคุณ"
-            />
+            >
+              {activeStudentList.map((sid, idx) => (
+                <option key={sid} value={sid}>
+                  เลขที่ {idx + 1} ({sid})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="activity-selector-box">
-            <label htmlFor="activity-select">เลือกกิจกรรม:</label>
+            <label htmlFor="activity-select">เลือกกิจกรรม (PAOR Cycle):</label>
             <select
               id="activity-select"
               className="activity-dropdown"
@@ -136,7 +173,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
             >
               {activities.map((act) => (
                 <option key={act.id} value={act.id}>
-                  {act.title} ({act.unit})
+                  {act.title}
                 </option>
               ))}
             </select>
@@ -153,7 +190,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
               🔄 เริ่มใหม่
             </button>
             <Link className="pill-link" href={`/student/timeline?studentId=${encodeURIComponent(studentId)}`}>
-              📜 Timeline ของฉัน
+              📜 Timeline
             </Link>
             <Link className="pill-link" href="/teacher/review">
               👩‍🏫 แดชบอร์ดครู
@@ -164,11 +201,13 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
 
       {/* Modern Notice Banner */}
       <div className="notice-strip">
-        <div className="notice-pill">🔬 ADI Framework</div>
+        <div className="notice-pill">🔬 PAOR {activity?.cycle ? `Cycle ${activity.cycle}` : "Cycle 1"} · ADI</div>
         <p>
           เรียนรู้ผ่าน 7 ขั้นตอน: ปรากฏการณ์ ➔ ตัวแปร ➔ ข้อมูลสืบเสาะ ➔ ร่าง CER ➔ ประเมินเพื่อน ➔ ปรับปรุงข้อโต้แย้ง ➔ สะท้อนคิด
         </p>
-        <span className="active-student-tag">ผู้เรียนปัจจุบัน: <strong>{studentId}</strong></span>
+        <span className="active-student-tag">
+          ห้อง {classId === "biology-m4-class-b" ? "ม.4/2" : "ม.4/1"} · ผู้เรียน: <strong>{studentId}</strong>
+        </span>
       </div>
 
       {/* 7-Phase Stepper */}

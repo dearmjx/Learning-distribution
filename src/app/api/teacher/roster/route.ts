@@ -1,6 +1,6 @@
 import { authErrorResponse, resolveLearningIdentity } from "@/lib/auth/supabase-identity";
 import { getLearningRepository } from "@/lib/repository/index";
-import type { AdiPhase, ClassRosterSummary, RosterStudentProgress } from "@/lib/domain/types";
+import type { AdiPhase, ClassRosterSummary, PaorCycle, RosterStudentProgress } from "@/lib/domain/types";
 
 export async function GET(request: Request) {
   try {
@@ -8,6 +8,8 @@ export async function GET(request: Request) {
     const repository = await getLearningRepository(identity);
     const url = new URL(request.url);
     const activityFilter = url.searchParams.get("activityId") ?? "ecosystem-food-web-01";
+    const classIdParam = url.searchParams.get("classId") ?? identity.context.classId ?? "biology-m4-class-a";
+    const isClassB = classIdParam === "biology-m4-class-b" || classIdParam.includes("4-2");
 
     const submissions = await repository.listSubmissions();
     const allRevisions = (
@@ -21,19 +23,24 @@ export async function GET(request: Request) {
       await Promise.all(submissions.map((s) => repository.listPeerReviews(s.id)))
     ).flat();
 
+    // Default 57 student roster: 29 for M.4/1, 28 for M.4/2
+    const totalExpectedStudents = isClassB ? 28 : 29;
+    const prefix = isClassB ? "402" : "401";
+    const rosterStudentIds = Array.from({ length: totalExpectedStudents }, (_, i) => `${prefix}${String(i + 1).padStart(2, "0")}`);
+
     // Group known student IDs from submissions and events
-    const studentIdsSet = new Set<string>();
-    for (const sub of submissions) studentIdsSet.add(sub.studentId);
-    for (const evt of allEvents) {
-      if (evt.studentId && evt.studentId !== "demo-teacher-01") {
-        studentIdsSet.add(evt.studentId);
+    const studentIdsSet = new Set<string>(rosterStudentIds);
+    for (const sub of submissions) {
+      if (isClassB ? sub.studentId.startsWith("402") : !sub.studentId.startsWith("402")) {
+        studentIdsSet.add(sub.studentId);
       }
     }
-    // If no students yet, provide synthetic roster default for classroom preview
-    if (studentIdsSet.size === 0) {
-      studentIdsSet.add("demo-student-01");
-      studentIdsSet.add("student-02");
-      studentIdsSet.add("student-03");
+    for (const evt of allEvents) {
+      if (evt.studentId && evt.studentId !== "demo-teacher-01" && evt.studentId !== "teacher") {
+        if (isClassB ? evt.studentId.startsWith("402") : !evt.studentId.startsWith("402")) {
+          studentIdsSet.add(evt.studentId);
+        }
+      }
     }
 
     const students: RosterStudentProgress[] = Array.from(studentIdsSet).map((studentId, index) => {
@@ -72,6 +79,8 @@ export async function GET(request: Request) {
         ? studentEvts[studentEvts.length - 1].occurredAt
         : (latestSub?.submittedAt ?? new Date().toISOString());
 
+      const cycle: PaorCycle = (activityFilter.includes("energy") || latestSub?.cycle === 2) ? 2 : 1;
+
       return {
         studentId,
         studentName: `นักเรียนเลขที่ ${index + 1} (${studentId})`,
@@ -84,16 +93,18 @@ export async function GET(request: Request) {
         peerReviewCompleted: Boolean(studentPeerRev),
         teacherScore: studentReview?.score,
         lastActiveAt: lastActive,
+        cycle,
       };
     });
 
     const summary: ClassRosterSummary = {
-      classId: identity.context.classId || "biology-m4-class-a",
-      className: "ชีววิทยา ม.4 ห้อง A (ประจำปีการศึกษา 2026)",
-      courseTitle: "ชีววิทยา ม.4: ระบบนิเวศและสายใยอาหาร",
+      classId: isClassB ? "biology-m4-class-b" : "biology-m4-class-a",
+      className: isClassB ? "ชีววิทยา ม.4 ห้อง 2 (28 คน)" : "ชีววิทยา ม.4 ห้อง 1 (29 คน)",
+      courseTitle: "ชีววิทยา ม.4: ระบบนิเวศ (Action Research Cohort 57 คน)",
       totalStudents: students.length,
       activeActivityId: activityFilter,
       students,
+      cycle: (activityFilter.includes("energy")) ? 2 : 1,
     };
 
     return Response.json(summary, {
@@ -105,3 +116,4 @@ export async function GET(request: Request) {
     return authErrorResponse(error);
   }
 }
+
