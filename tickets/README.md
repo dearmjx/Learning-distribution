@@ -17,7 +17,7 @@ Lightweight file-based tracker. One file per ticket: `LOS-NNN-slug.md`.
 | [LOS-007](LOS-007-decide-cer-synthetic-thinking-rubric-mapping.md) | P1 | done | Score CER and synthetic-thinking rubrics separately | research-design |
 | [LOS-008](LOS-008-rate-limit-api-coach-chat-and.md) | P1 | done | Rate-limit `/api/coach/chat` and add `/api/ready` probe | ops |
 | [LOS-009](LOS-009-live-verification-ollama-supabase-end-to.md) | P1 | open | Live verification: Ollama + Supabase end-to-end | verification |
-| [LOS-010](LOS-010-commit-phase-11-work-off-main.md) | P1 | open | Commit Phase 11 work off `main` | hygiene |
+| [LOS-010](LOS-010-commit-phase-11-work-off-main.md) | P1 | done | Commit Phase 11 work off `main` | hygiene |
 | [LOS-013](LOS-013-enforce-strict-guardrail-on-coach-chat.md) | P0 | done | Enforce strict Socratic guardrail on Coach chat replies | safety |
 | [LOS-011](LOS-011-ai-opponent-role-audit-gap-7.md) | P2 | done | AI Opponent role (audit gap #7) | feature |
 | [LOS-012](LOS-012-automated-pre-post-draft-1-vs.md) | P2 | done | Automated pre/post (Draft 1 vs Final) analytics (audit gap #10) | feature |
