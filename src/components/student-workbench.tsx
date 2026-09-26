@@ -22,12 +22,13 @@ interface StudentWorkbenchProps {
 export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = {}) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activityId, setActivityId] = useState("");
+  const [persistenceMode, setPersistenceMode] = useState<"memory" | "supabase">("memory");
   const [classId, setClassId] = useState("biology-m4-class-a");
   const [studentId, setStudentId] = useState("40101");
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([1]);
 
-  // Generate 57 student IDs for the 2 classrooms
+  // Generate 57 student IDs for the 2 classrooms (memory/demo mode only)
   const classAStudents = useMemo(() => Array.from({ length: 29 }, (_, i) => `401${String(i + 1).padStart(2, "0")}`), []);
   const classBStudents = useMemo(() => Array.from({ length: 28 }, (_, i) => `402${String(i + 1).padStart(2, "0")}`), []);
   const activeStudentList = useMemo(() => classId === "biology-m4-class-b" ? classBStudents : classAStudents, [classId, classAStudents, classBStudents]);
@@ -39,8 +40,9 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
   const [, setRevisedSubmission] = useState<Submission | null>(null);
   const [error, setError] = useState("");
 
-  // Load saved student ID and classroom from localStorage if available
+  // Load saved student ID and classroom from localStorage in memory/demo mode only
   useEffect(() => {
+    if (persistenceMode === "supabase") return;
     try {
       const savedClass = localStorage.getItem("learning_os_class_id");
       if (savedClass) setClassId(savedClass);
@@ -49,9 +51,10 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
     } catch {
       // ignore
     }
-  }, []);
+  }, [persistenceMode]);
 
   function handleClassIdChange(val: string) {
+    if (persistenceMode === "supabase") return;
     setClassId(val);
     const defaultStudent = val === "biology-m4-class-b" ? "40201" : "40101";
     setStudentId(defaultStudent);
@@ -64,6 +67,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
   }
 
   function handleStudentIdChange(val: string) {
+    if (persistenceMode === "supabase") return;
     const cleaned = val.trim() || "40101";
     setStudentId(val);
     try {
@@ -76,10 +80,21 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
   useEffect(() => {
     void fetch("/api/activities")
       .then((res) => res.json())
-      .then((data: { activities: Activity[] }) => {
+      .then((data: {
+        activities: Activity[];
+        persistence?: "memory" | "supabase";
+        session?: { studentId?: string | null; classId?: string };
+      }) => {
         setActivities(data.activities);
         const selected = data.activities.find((item) => item.id === initialActivityId)?.id ?? data.activities[0]?.id ?? "";
         setActivityId(selected);
+        if (data.persistence === "supabase") {
+          setPersistenceMode("supabase");
+          if (data.session?.classId) setClassId(data.session.classId);
+          if (data.session?.studentId) setStudentId(data.session.studentId);
+        } else {
+          setPersistenceMode("memory");
+        }
       })
       .catch(() => setError("โหลดกิจกรรมไม่สำเร็จ"));
   }, [initialActivityId]);
@@ -126,36 +141,40 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
         </div>
 
         <div className="hero-actions">
-          {/* Classroom Selector */}
-          <div className="student-id-selector-box">
-            <label htmlFor="class-select">🏫 ห้องเรียน:</label>
-            <select
-              id="class-select"
-              className="form-select"
-              value={classId}
-              onChange={(e) => handleClassIdChange(e.target.value)}
-            >
-              <option value="biology-m4-class-a">ม.4/1 (29 คน)</option>
-              <option value="biology-m4-class-b">ม.4/2 (28 คน)</option>
-            </select>
-          </div>
+          {persistenceMode !== "supabase" && (
+            <>
+              {/* Classroom Selector */}
+              <div className="student-id-selector-box">
+                <label htmlFor="class-select">🏫 ห้องเรียน:</label>
+                <select
+                  id="class-select"
+                  className="form-select"
+                  value={classId}
+                  onChange={(e) => handleClassIdChange(e.target.value)}
+                >
+                  <option value="biology-m4-class-a">ม.4/1 (29 คน)</option>
+                  <option value="biology-m4-class-b">ม.4/2 (28 คน)</option>
+                </select>
+              </div>
 
-          {/* Student ID Roster Selector & Input */}
-          <div className="student-id-selector-box">
-            <label htmlFor="student-id-select">🧑‍🎓 รหัสนักเรียน:</label>
-            <select
-              id="student-id-select"
-              className="form-select"
-              value={studentId}
-              onChange={(e) => handleStudentIdChange(e.target.value)}
-            >
-              {activeStudentList.map((sid, idx) => (
-                <option key={sid} value={sid}>
-                  เลขที่ {idx + 1} ({sid})
-                </option>
-              ))}
-            </select>
-          </div>
+              {/* Student ID Roster Selector & Input */}
+              <div className="student-id-selector-box">
+                <label htmlFor="student-id-select">🧑‍🎓 รหัสนักเรียน:</label>
+                <select
+                  id="student-id-select"
+                  className="form-select"
+                  value={studentId}
+                  onChange={(e) => handleStudentIdChange(e.target.value)}
+                >
+                  {activeStudentList.map((sid, idx) => (
+                    <option key={sid} value={sid}>
+                      เลขที่ {idx + 1} ({sid})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
 
           <div className="activity-selector-box">
             <label htmlFor="activity-select">เลือกกิจกรรม (PAOR Cycle):</label>
@@ -189,7 +208,10 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
             >
               🔄 เริ่มใหม่
             </button>
-            <Link className="pill-link" href={`/student/timeline?studentId=${encodeURIComponent(studentId)}`}>
+            <Link
+              className="pill-link"
+              href={persistenceMode === "supabase" ? "/student/timeline" : `/student/timeline?studentId=${encodeURIComponent(studentId)}`}
+            >
               📜 Timeline
             </Link>
             <Link className="pill-link" href="/teacher/review">
@@ -206,7 +228,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
           เรียนรู้ผ่าน 7 ขั้นตอน: ปรากฏการณ์ ➔ ตัวแปร ➔ ข้อมูลสืบเสาะ ➔ ร่าง CER ➔ ประเมินเพื่อน ➔ ปรับปรุงข้อโต้แย้ง ➔ สะท้อนคิด
         </p>
         <span className="active-student-tag">
-          ห้อง {classId === "biology-m4-class-b" ? "ม.4/2" : "ม.4/1"} · ผู้เรียน: <strong>{studentId}</strong>
+          ห้อง {persistenceMode === "supabase" ? classId : classId === "biology-m4-class-b" ? "ม.4/2" : "ม.4/1"} · ผู้เรียน: <strong>{studentId}</strong>
         </span>
       </div>
 

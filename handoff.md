@@ -531,3 +531,42 @@ Commands run and actual results:
 
 Next action: LOS-004 (Supabase teacher observation notes).
 
+## LOS-004 — Implement Supabase teacher observation notes — 2026-09-25
+
+Status: DONE.
+
+Files changed:
+- `supabase/migrations/009_teacher_observation_notes.sql` (new) — adds `teacher_observation_notes` table with teacher- and class-scoped RLS (`teacher_profile_id = learning_profile_id() AND teacher_id = learning_external_id() AND active_class_member(class_id, 'teacher')`).
+- `src/lib/supabase/types.ts` — added `teacher_observation_notes` table types to `Database`.
+- `src/lib/repository/supabase-repository.ts` — implemented `addTeacherObservationNote` and `listTeacherObservationNotes` (with `cycle` and `activityId` filters and server-enforced teacher/class scope) and `mapTeacherObservationNote`.
+- `supabase/tests/phase9_isolation.sql` — added `teacher_b` and pgTAP assertions confirming teacher A cannot read or insert teacher B's observation notes.
+- `src/lib/supabase-repository.test.ts` — added test coverage for observation note persistence, `cycle`/`activityId` filtering, and cross-teacher scope denial.
+- `tickets/LOS-004-implement-supabase-teacher-observation-notes-currently.md`, `tickets/README.md` — marked LOS-004 done.
+
+Commands run and actual results:
+- `npm.cmd run typecheck` → PASSED (0 errors, exit code 0).
+- `npm.cmd test` → PASSED (16 test files / 61 tests passed, exit code 0).
+- `npm.cmd run build` → PASSED (24 routes compiled cleanly, exit code 0).
+
+Next action: LOS-005 remainder (real memberships in teacher roster route and hiding student picker in Supabase mode).
+
+## LOS-005 remainder — Real memberships in teacher roster & session-derived student workbench identity — 2026-09-26
+
+Status: DONE.
+
+Files changed:
+- `supabase/migrations/010_teacher_class_roster_rls.sql` (new) — adds `teacher_can_view_class_profile` (`SECURITY DEFINER`) and `profiles_teacher_class_select` RLS policy on `learning_profiles` so teachers can read active class members' profiles when building the roster.
+- `src/app/api/teacher/roster/route.ts` — builds the roster from real active `memberships` and `learning_profiles` in Supabase mode (ignoring browser-supplied `classId` and keeping the synthetic 29/28 `401xx`/`402xx` roster only for memory/demo mode); resolves `cycle` from `submission.cycle` then `activity.cycle`.
+- `src/app/api/activities/route.ts` — returns `persistence` mode and server-resolved `session` (`studentId`, `classId`, `courseId`) alongside `activities`.
+- `src/components/student-workbench.tsx` — hides the classroom and student ID pickers in Supabase mode and uses the session's `studentId` and `classId` instead of `localStorage`.
+- `src/components/student-timeline.tsx` — removes hardcoded `studentId=demo-student-01` query param when fetching `/api/sessions`.
+- `src/lib/domain/schemas.ts` — makes `studentId` optional in `reflectionInputSchema`.
+- `src/lib/teacher-pilot.test.ts` — adds tests for real-membership roster building in Supabase mode and session metadata on `GET /api/activities`.
+- `tickets/LOS-005-remove-hardcoded-identities-and-counts-from.md`, `tickets/README.md` — marked LOS-005 remainder done.
+
+Commands run and actual results:
+- `npm.cmd run typecheck` → PASSED (0 errors, exit code 0).
+- `npm.cmd test` → PASSED (16 test files / 63 tests passed, exit code 0).
+- `npm.cmd run build` → PASSED (24 routes compiled cleanly, exit code 0).
+
+Next action: LOS-009 (Live end-to-end verification against live Supabase + local Ollama).

@@ -154,7 +154,7 @@ export const studentReflectionDataSchema = z.object({
 });
 
 export const reflectionInputSchema = z.object({
-  studentId: z.string().min(1),
+  studentId: z.string().min(1).optional(),
   activityId: z.string().min(1),
   submissionId: z.string().optional(),
   conceptualLearning: z.string().max(8000).optional(),

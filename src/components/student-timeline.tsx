@@ -13,7 +13,7 @@ export function StudentTimeline() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    void fetch("/api/sessions?studentId=demo-student-01")
+    void fetch("/api/sessions")
       .then((response) => response.json())
       .then((payload: TimelineData & { error?: string }) => {
         if (payload.error) throw new Error(payload.error);
