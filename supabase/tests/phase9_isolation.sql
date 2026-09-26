@@ -1,12 +1,12 @@
--- Phase 9 live RLS test. Run with: supabase test db
+-- Phase 9/11 live RLS test. Run with: supabase test db
 -- Synthetic auth users are created inside a transaction and rolled back.
 
 BEGIN;
 
-SELECT plan(10);
+SELECT plan(13);
 
-CREATE TEMP TABLE phase9_ids (student_a UUID, student_b UUID, teacher_a UUID, student_other UUID);
-INSERT INTO phase9_ids VALUES (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid());
+CREATE TEMP TABLE phase9_ids (student_a UUID, student_b UUID, teacher_a UUID, teacher_b UUID, student_other UUID);
+INSERT INTO phase9_ids VALUES (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid());
 
 SET LOCAL ROLE postgres;
 INSERT INTO auth.users (id, aud, role, email, encrypted_password)
@@ -19,6 +19,9 @@ INSERT INTO auth.users (id, aud, role, email, encrypted_password)
 SELECT teacher_a, 'authenticated', 'authenticated', 'phase9-teacher@example.invalid', 'not-used'
 FROM phase9_ids;
 INSERT INTO auth.users (id, aud, role, email, encrypted_password)
+SELECT teacher_b, 'authenticated', 'authenticated', 'phase9-teacher-b@example.invalid', 'not-used'
+FROM phase9_ids;
+INSERT INTO auth.users (id, aud, role, email, encrypted_password)
 SELECT student_other, 'authenticated', 'authenticated', 'phase9-other@example.invalid', 'not-used'
 FROM phase9_ids;
 
@@ -26,12 +29,14 @@ INSERT INTO learning_profiles (id, auth_user_id, external_id, display_name, role
 SELECT student_a, student_a, 'phase9-student-a', 'Synthetic Student A', 'student', 'demo-school-01', 'biology-m4' FROM phase9_ids
 UNION ALL SELECT student_b, student_b, 'phase9-student-b', 'Synthetic Student B', 'student', 'demo-school-01', 'biology-m4' FROM phase9_ids
 UNION ALL SELECT teacher_a, teacher_a, 'phase9-teacher-a', 'Synthetic Teacher A', 'teacher', 'demo-school-01', 'biology-m4' FROM phase9_ids
+UNION ALL SELECT teacher_b, teacher_b, 'phase9-teacher-b', 'Synthetic Teacher B', 'teacher', 'demo-school-01', 'biology-m4' FROM phase9_ids
 UNION ALL SELECT student_other, student_other, 'phase9-student-other', 'Synthetic Student Other', 'student', 'demo-school-01', 'biology-m4' FROM phase9_ids;
 
 INSERT INTO memberships (profile_id, class_id, role)
 SELECT student_a, 'biology-m4-class-a', 'student' FROM phase9_ids
 UNION ALL SELECT student_b, 'biology-m4-class-a', 'student' FROM phase9_ids
-UNION ALL SELECT teacher_a, 'biology-m4-class-a', 'teacher' FROM phase9_ids;
+UNION ALL SELECT teacher_a, 'biology-m4-class-a', 'teacher' FROM phase9_ids
+UNION ALL SELECT teacher_b, 'biology-m4-class-a', 'teacher' FROM phase9_ids;
 
 SET LOCAL ROLE service_role;
 INSERT INTO submissions (student_id, activity_id, profile_id, class_id, version, content, workflow_state)
@@ -40,6 +45,11 @@ SELECT 'phase9-student-a', 'ecosystem-food-web-01', student_a, 'biology-m4-class
 UNION ALL
 SELECT 'phase9-student-b', 'ecosystem-food-web-01', student_b, 'biology-m4-class-a', 1,
        '{"claim":"B","evidence":"B","reasoning":"B"}'::jsonb, 'submitted' FROM phase9_ids;
+
+INSERT INTO teacher_observation_notes (teacher_id, teacher_profile_id, class_id, cycle, activity_id, phase, content)
+SELECT 'phase9-teacher-a', teacher_a, 'biology-m4-class-a', 1, 'ecosystem-food-web-01', 'observe', 'Teacher A private PAOR observation' FROM phase9_ids
+UNION ALL
+SELECT 'phase9-teacher-b', teacher_b, 'biology-m4-class-a', 1, 'ecosystem-food-web-01', 'observe', 'Teacher B private PAOR observation' FROM phase9_ids;
 
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', student_a::text, true) FROM phase9_ids;
@@ -53,6 +63,11 @@ SELECT throws_ok($sql$SELECT * FROM research_identity_mapping$sql$, NULL, NULL, 
 
 SELECT set_config('request.jwt.claim.sub', teacher_a::text, true) FROM phase9_ids;
 SELECT is((SELECT count(*)::int FROM submissions), 2, 'teacher sees both submissions in assigned class');
+SELECT is((SELECT count(*)::int FROM teacher_observation_notes), 1, 'teacher A sees only teacher A observation notes');
+SELECT is((SELECT min(teacher_id) FROM teacher_observation_notes), 'phase9-teacher-a', 'teacher A cannot read teacher B observation notes');
+SELECT throws_ok($sql$INSERT INTO teacher_observation_notes (teacher_id, teacher_profile_id, class_id, cycle, activity_id, phase, content)
+    SELECT 'phase9-teacher-b', learning_profile_id(), 'biology-m4-class-a', 1, 'ecosystem-food-web-01', 'observe', 'spoofed note'$sql$,
+    '42501', NULL, 'teacher A cannot insert observation notes as teacher B');
 
 SELECT set_config('request.jwt.claim.sub', student_other::text, true) FROM phase9_ids;
 SELECT is((SELECT count(*)::int FROM submissions), 0, 'unauthorized user sees no class submissions');

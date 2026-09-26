@@ -296,4 +296,71 @@ describe("Learning persistence factory", () => {
     expect(csv).toContain("M41_05");
     expect(csv.split("\n")).toHaveLength(2);
   });
+
+  it("persists and filters teacher observation notes with teacher/class isolation (LOS-004)", async () => {
+    const client = createFakeSupabaseClient();
+    const teacherARepo = createSupabaseRepository(client, {
+      context: {
+        ...createLocalDevelopmentContext("teacher", "ecosystem-food-web-01"),
+        teacherId: "teacher-a",
+        classId: "biology-m4-class-a",
+      },
+      profileId: "profile-teacher-a",
+    });
+    const teacherBRepo = createSupabaseRepository(client, {
+      context: {
+        ...createLocalDevelopmentContext("teacher", "ecosystem-food-web-01"),
+        teacherId: "teacher-b",
+        classId: "biology-m4-class-a",
+      },
+      profileId: "profile-teacher-b",
+    });
+
+    const noteA1 = await teacherARepo.addTeacherObservationNote({
+      teacherId: "spoofed-teacher",
+      classId: "spoofed-class",
+      cycle: 1,
+      activityId: "ecosystem-food-web-01",
+      phase: "observe",
+      content: "Cycle 1 food web observation by Teacher A",
+    });
+    expect(noteA1.teacherId).toBe("teacher-a");
+    expect(noteA1.classId).toBe("biology-m4-class-a");
+
+    await teacherARepo.addTeacherObservationNote({
+      teacherId: "teacher-a",
+      classId: "biology-m4-class-a",
+      cycle: 2,
+      activityId: "ecosystem-energy-flow-01",
+      phase: "reflect",
+      content: "Cycle 2 energy flow reflection by Teacher A",
+    });
+
+    await teacherBRepo.addTeacherObservationNote({
+      teacherId: "teacher-b",
+      classId: "biology-m4-class-a",
+      cycle: 1,
+      activityId: "ecosystem-food-web-01",
+      phase: "plan",
+      content: "Cycle 1 plan by Teacher B",
+    });
+
+    const allA = await teacherARepo.listTeacherObservationNotes();
+    expect(allA).toHaveLength(2);
+    expect(allA.every((n) => n.teacherId === "teacher-a")).toBe(true);
+
+    const cycle1A = await teacherARepo.listTeacherObservationNotes("teacher-a", 1);
+    expect(cycle1A).toHaveLength(1);
+    expect(cycle1A[0].content).toBe("Cycle 1 food web observation by Teacher A");
+
+    const energyA = await teacherARepo.listTeacherObservationNotes("teacher-a", undefined, "ecosystem-energy-flow-01");
+    expect(energyA).toHaveLength(1);
+    expect(energyA[0].cycle).toBe(2);
+
+    const allB = await teacherBRepo.listTeacherObservationNotes();
+    expect(allB).toHaveLength(1);
+    expect(allB[0].teacherId).toBe("teacher-b");
+
+    await expect(teacherARepo.listTeacherObservationNotes("teacher-b")).rejects.toThrow(/scope denied/i);
+  });
 });

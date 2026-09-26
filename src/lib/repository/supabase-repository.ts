@@ -80,6 +80,22 @@ function mapTeacherReview(data: Database["public"]["Tables"]["teacher_reviews"][
   };
 }
 
+function mapTeacherObservationNote(
+  data: Database["public"]["Tables"]["teacher_observation_notes"]["Row"],
+): TeacherObservationNote {
+  return {
+    id: data.id,
+    teacherId: data.teacher_id,
+    classId: data.class_id,
+    cycle: data.cycle,
+    activityId: data.activity_id,
+    phase: data.phase,
+    content: data.content,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
+}
+
 function mapPeerReview(data: Database["public"]["Tables"]["peer_reviews"]["Row"]): PeerReview {
   return {
     id: data.id,
@@ -482,18 +498,40 @@ export class SupabaseRepository implements ScopedLearningRepository {
 
   async addTeacherObservationNote(input: Omit<TeacherObservationNote, "id" | "createdAt" | "updatedAt">): Promise<TeacherObservationNote> {
     if (this.scope.context.role !== "teacher" || !this.scope.context.teacherId) throw new Error("Only a teacher can record classroom observation notes");
-    const now = new Date().toISOString();
-    const note: TeacherObservationNote = {
-      ...input,
-      id: crypto.randomUUID(),
-      createdAt: now,
-      updatedAt: now,
-    };
-    return note;
+    const { data, error } = await this.client
+      .from("teacher_observation_notes")
+      .insert({
+        teacher_id: this.scope.context.teacherId,
+        teacher_profile_id: this.scope.profileId ?? null,
+        class_id: this.scope.context.classId,
+        cycle: input.cycle,
+        activity_id: input.activityId,
+        phase: input.phase,
+        content: input.content,
+      })
+      .select()
+      .single();
+    if (error || !data) throw new Error(`Supabase teacher observation note write failed: ${error?.message ?? "empty response"}`);
+    return mapTeacherObservationNote(data);
   }
 
-  async listTeacherObservationNotes(_teacherId?: string, _cycle?: PaorCycle, _activityId?: string): Promise<TeacherObservationNote[]> {
-    return [];
+  async listTeacherObservationNotes(teacherId?: string, cycle?: PaorCycle, activityId?: string): Promise<TeacherObservationNote[]> {
+    if (this.scope.context.role !== "teacher" || !this.scope.context.teacherId) throw new Error("Only a teacher can list classroom observation notes");
+    const scopedTeacherId = this.scope.context.teacherId;
+    if (teacherId && teacherId !== scopedTeacherId) {
+      throw new Error("Learning scope denied: teacher identity is controlled by the authenticated session");
+    }
+    let query = this.client
+      .from("teacher_observation_notes")
+      .select()
+      .eq("teacher_id", scopedTeacherId)
+      .eq("class_id", this.scope.context.classId)
+      .order("created_at", { ascending: false });
+    if (cycle) query = query.eq("cycle", cycle);
+    if (activityId) query = query.eq("activity_id", activityId);
+    const { data, error } = await query;
+    if (error) throw new Error(`Supabase teacher observation note list failed: ${error.message}`);
+    return (data ?? []).map(mapTeacherObservationNote);
   }
 
   async appendLearningEvent(event: LearningEvent): Promise<LearningEvent> {

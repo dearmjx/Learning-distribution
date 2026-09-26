@@ -156,6 +156,12 @@ export interface Database {
         Update: { teacher_id?: string; teacher_profile_id?: string | null; class_id?: string | null; scores?: Record<string, number>; rubric_scores?: TeacherReviewRubricScores | null; synthetic_scores?: SyntheticThinkingRubricScores | null; cycle?: PaorCycle | null; feedback?: string; final_score?: number; authorship_review_decision?: string };
         Relationships: [];
       };
+      teacher_observation_notes: {
+        Row: { id: string; teacher_id: string; teacher_profile_id: string | null; class_id: string; cycle: PaorCycle; activity_id: string; phase: "plan" | "act" | "observe" | "reflect"; content: string; created_at: string; updated_at: string };
+        Insert: { id?: string; teacher_id: string; teacher_profile_id?: string | null; class_id: string; cycle: PaorCycle; activity_id: string; phase: "plan" | "act" | "observe" | "reflect"; content: string; created_at?: string; updated_at?: string };
+        Update: { teacher_id?: string; teacher_profile_id?: string | null; class_id?: string; cycle?: PaorCycle; activity_id?: string; phase?: "plan" | "act" | "observe" | "reflect"; content?: string; updated_at?: string };
+        Relationships: [];
+      };
       learning_events: {
         Row: { id: string; schema_version: number; student_id: string; activity_id: string; profile_id: string | null; class_id: string | null; event_type: string; payload: Record<string, unknown>; context: Record<string, unknown>; actor: Record<string, unknown>; correlation_id: string; idempotency_key: string | null; cycle: PaorCycle | null; occurred_at: string; created_at: string };
         Insert: { id?: string; schema_version?: number; student_id: string; activity_id: string; profile_id?: string | null; class_id?: string | null; event_type: string; payload?: Record<string, unknown>; context?: Json; actor?: Json; correlation_id: string; idempotency_key?: string | null; cycle?: PaorCycle | null; occurred_at?: string; created_at?: string };
