@@ -94,6 +94,8 @@ export interface ScopedLearningRepository {
   listInteractions(studentId: string, activityId?: string): Promise<AiInteraction[]>;
   addPeerReview(input: Omit<PeerReview, "id" | "createdAt">): Promise<PeerReview>;
   listPeerReviews(submissionId?: string, reviewerStudentId?: string): Promise<PeerReview[]>;
+  /** Reviews written about the scoped student's own work, with the reviewer anonymized. */
+  listReceivedPeerReviews(activityId: string): Promise<PeerReview[]>;
   getAssignedPeerReviewDraft(studentId: string, activityId: string): Promise<PeerReviewSubmission | undefined>;
   addReflection(input: Omit<StudentReflectionData, "id" | "completedAt">): Promise<StudentReflectionData>;
   getReflection(studentId: string, activityId: string): Promise<StudentReflectionData | undefined>;

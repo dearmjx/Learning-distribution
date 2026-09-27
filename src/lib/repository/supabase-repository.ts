@@ -80,6 +80,26 @@ function mapTeacherReview(data: Database["public"]["Tables"]["teacher_reviews"][
   };
 }
 
+function mapReflection(data: Database["public"]["Tables"]["reflections"]["Row"]): StudentReflectionData {
+  return {
+    id: data.id,
+    studentId: data.student_id,
+    activityId: data.activity_id,
+    submissionId: data.submission_id ?? undefined,
+    conceptualLearning: data.conceptual_learning,
+    inquiryProcessReflection: data.inquiry_process_reflection,
+    peerReviewExperience: data.peer_review_experience ?? undefined,
+    confidenceScore: data.confidence_score ?? undefined,
+    keyTakeaway: data.key_takeaway ?? undefined,
+    analyticalThinkingScore: data.analytical_thinking_score ?? undefined,
+    aiLiteracyScore: data.ai_literacy_score ?? undefined,
+    reflectionText: data.reflection_text ?? undefined,
+    keyLearnings: data.key_learnings ?? undefined,
+    confidenceRating: data.confidence_rating ?? undefined,
+    completedAt: data.completed_at,
+  };
+}
+
 function mapTeacherObservationNote(
   data: Database["public"]["Tables"]["teacher_observation_notes"]["Row"],
 ): TeacherObservationNote {
@@ -387,6 +407,26 @@ export class SupabaseRepository implements ScopedLearningRepository {
     return (data ?? []).map(mapPeerReview);
   }
 
+  async listReceivedPeerReviews(activityId: string): Promise<PeerReview[]> {
+    if (this.scope.context.role !== "student" || !this.scope.context.studentId) throw new Error("Student scope required");
+    // RLS hides reviews from their author, so an auth-bound RPC returns them without reviewer identity.
+    const { data, error } = await this.client.rpc("get_received_peer_reviews", { p_activity_id: activityId });
+    if (error) throw new Error(`Supabase received peer-review lookup failed: ${error.message}`);
+    const rows = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
+    return rows.map((row) => ({
+      id: String(row.id),
+      submissionId: String(row.submission_id),
+      reviewerStudentId: "เพื่อนร่วมชั้น (ไม่ระบุชื่อ)",
+      authorStudentId: this.scope.context.studentId!,
+      activityId,
+      scores: row.scores as PeerReview["scores"],
+      strengths: typeof row.strengths === "string" ? row.strengths : undefined,
+      suggestions: typeof row.suggestions === "string" ? row.suggestions : undefined,
+      feedback: typeof row.feedback === "string" ? row.feedback : "",
+      createdAt: String(row.created_at),
+    }));
+  }
+
   async addReflection(input: Omit<StudentReflectionData, "id" | "completedAt">): Promise<StudentReflectionData> {
     if (this.scope.context.role !== "student" || !this.scope.context.studentId) throw new Error("Only students can submit reflections");
     assertStudentScope(this.scope, input.studentId);
@@ -400,8 +440,14 @@ export class SupabaseRepository implements ScopedLearningRepository {
           conceptual_learning: input.conceptualLearning ?? input.reflectionText ?? "",
           inquiry_process_reflection: input.inquiryProcessReflection ?? "",
           peer_review_experience: input.peerReviewExperience ?? null,
-          confidence_score: input.confidenceScore ?? 3,
+          // Never impute: missing self-ratings stay NULL (LOS-014).
+          confidence_score: input.confidenceScore ?? null,
           key_takeaway: input.keyTakeaway ?? null,
+          analytical_thinking_score: input.analyticalThinkingScore ?? null,
+          ai_literacy_score: input.aiLiteracyScore ?? null,
+          reflection_text: input.reflectionText ?? null,
+          key_learnings: input.keyLearnings ?? null,
+          confidence_rating: input.confidenceRating ?? null,
           profile_id: this.scope.profileId ?? null,
           class_id: this.scope.context.classId,
         },
@@ -410,38 +456,14 @@ export class SupabaseRepository implements ScopedLearningRepository {
       .select()
       .single();
     if (error || !data) throw new Error(`Supabase reflection write failed: ${error?.message ?? "empty response"}`);
-    return {
-      id: data.id,
-      studentId: data.student_id,
-      activityId: data.activity_id,
-      submissionId: data.submission_id ?? undefined,
-      conceptualLearning: data.conceptual_learning,
-      inquiryProcessReflection: data.inquiry_process_reflection,
-      peerReviewExperience: data.peer_review_experience ?? undefined,
-      confidenceScore: data.confidence_score,
-      keyTakeaway: data.key_takeaway ?? undefined,
-      completedAt: data.completed_at,
-    };
+    return mapReflection(data);
   }
 
   async getReflection(studentId: string, activityId: string): Promise<StudentReflectionData | undefined> {
     assertStudentScope(this.scope, studentId);
     const { data, error } = await this.client.from("reflections").select().eq("student_id", this.scope.context.studentId ?? studentId).eq("activity_id", activityId).maybeSingle();
     if (error) throw new Error(`Supabase reflection lookup failed: ${error.message}`);
-    return data
-      ? {
-          id: data.id,
-          studentId: data.student_id,
-          activityId: data.activity_id,
-          submissionId: data.submission_id ?? undefined,
-          conceptualLearning: data.conceptual_learning,
-          inquiryProcessReflection: data.inquiry_process_reflection,
-          peerReviewExperience: data.peer_review_experience ?? undefined,
-          confidenceScore: data.confidence_score,
-          keyTakeaway: data.key_takeaway ?? undefined,
-          completedAt: data.completed_at,
-        }
-      : undefined;
+    return data ? mapReflection(data) : undefined;
   }
 
   async listReflections(studentId?: string, activityId?: string): Promise<StudentReflectionData[]> {
@@ -452,18 +474,7 @@ export class SupabaseRepository implements ScopedLearningRepository {
     if (activityId) query = query.eq("activity_id", activityId);
     const { data, error } = await query;
     if (error) throw new Error(`Supabase reflection list failed: ${error.message}`);
-    return (data ?? []).map((item) => ({
-      id: item.id,
-      studentId: item.student_id,
-      activityId: item.activity_id,
-      submissionId: item.submission_id ?? undefined,
-      conceptualLearning: item.conceptual_learning,
-      inquiryProcessReflection: item.inquiry_process_reflection,
-      peerReviewExperience: item.peer_review_experience ?? undefined,
-      confidenceScore: item.confidence_score,
-      keyTakeaway: item.key_takeaway ?? undefined,
-      completedAt: item.completed_at,
-    }));
+    return (data ?? []).map(mapReflection);
   }
 
   async addTeacherReview(input: Omit<TeacherReview, "id" | "createdAt">): Promise<TeacherReview> {

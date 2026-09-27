@@ -31,7 +31,13 @@ export async function POST(request: Request) {
     const activity = await repository.getActivity(parsed.data.activityId);
     if (!activity) return Response.json({ error: "ไม่พบกิจกรรมที่ระบุ" }, { status: 404 });
     const studentId = identity.context.studentId!;
-    const reflection = await repository.addReflection({ ...parsed.data, studentId });
+    // Reflection follows the student's own work: link it to their latest submission.
+    const latest = await repository.latestSubmission(studentId, parsed.data.activityId);
+    if (!latest) {
+      return Response.json({ error: "กรุณาทำงาน Draft 1 ให้เสร็จก่อนส่งการสะท้อนคิด", code: "submission_required" }, { status: 409 });
+    }
+    const submissionId = parsed.data.submissionId ?? latest.id;
+    const reflection = await repository.addReflection({ ...parsed.data, submissionId, studentId });
     const eventKey = request.headers.get("Idempotency-Key") ?? `reflection:${studentId}:${parsed.data.activityId}`;
     await appendPersistedLearningEvent(repository, {
       studentId,
@@ -43,8 +49,8 @@ export async function POST(request: Request) {
       idempotencyKey: `${eventKey}:completed`,
     });
 
-    if (parsed.data.submissionId) {
-      const studentSubmission = await repository.getSubmission(parsed.data.submissionId);
+    {
+      const studentSubmission = await repository.getSubmission(submissionId);
       if (studentSubmission && studentSubmission.studentId === studentId) {
         const transition = adiWorkflow.transition(studentSubmission.workflowState, "submit_reflection", { peerReviewAllowed: activity.peerReviewAllowed });
         if (transition.allowed) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Activity, CerResponse, CoachFeedback, FeedbackDecision, PeerReview, Submission } from "@/lib/domain/types";
 
 interface Phase6Props {
@@ -31,33 +31,28 @@ export function Phase6Revision({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [revisedSubmission, setRevisedSubmission] = useState<Submission | null>(null);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState("");
+
+  // Only real peer reviews of this student's work are shown; never synthetic ones (LOS-014).
+  const loadReceivedReviews = useCallback(async () => {
+    setReviewsLoading(true);
+    setReviewsError("");
+    try {
+      const res = await fetch(`/api/peer-reviews?activityId=${encodeURIComponent(activity.id)}`);
+      const data = (await res.json()) as { receivedReviews?: PeerReview[]; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "โหลดข้อเสนอแนะจากเพื่อนไม่สำเร็จ");
+      setPeerReviews(data.receivedReviews ?? []);
+    } catch (err) {
+      setReviewsError(err instanceof Error ? err.message : "โหลดข้อเสนอแนะจากเพื่อนไม่สำเร็จ");
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, [activity.id]);
 
   useEffect(() => {
-    void fetch(`/api/peer-reviews?activityId=${activity.id}&authorId=${encodeURIComponent(studentId)}`)
-      .then((res) => res.json())
-      .then((data: { reviews?: PeerReview[] }) => {
-        if (data.reviews && data.reviews.length > 0) {
-          setPeerReviews(data.reviews);
-        } else {
-          // Synthetic peer review received
-          setPeerReviews([
-            {
-              id: "peer-feedback-01",
-              submissionId: "synthetic-sub-01",
-              reviewerStudentId: "peer-student-05",
-              authorStudentId: studentId,
-              activityId: activity.id,
-              feedback: "อธิบายเรื่องการเพิ่มขึ้นของหนูได้ชัดเจนมาก แต่อยากให้เพิ่มตัวเลข kcal ของพลังงานที่สูญเสียไปตามกฎ 10% ในส่วน Reasoning จะทำให้ข้อโต้แย้งน่าเชื่อถือยิ่งขึ้น",
-              createdAt: new Date().toISOString(),
-              scores: { claim: 5, evidence: 4, reasoning: 4 },
-              strengths: "ระบุตัวเลขและแนวโน้มการเปลี่ยนแปลงได้ตรงจุด",
-              suggestions: "ระบุกฎ 10% และการสูญเสียพลังงานความร้อนเพิ่มเติม",
-            },
-          ]);
-        }
-      })
-      .catch(() => {});
-  }, [activity.id, studentId]);
+    void loadReceivedReviews();
+  }, [loadReceivedReviews]);
 
   function handleDecisionChange(key: string, source: "ai_coach" | "peer", feedbackItem: string, status: "accept" | "reject" | "modify") {
     setFeedbackDecisions((prev) => ({
@@ -67,7 +62,8 @@ export function Phase6Revision({
         feedbackItem,
         source,
         status,
-        justificationText: prev[key]?.justificationText ?? (status === "accept" ? "นำข้อมูลและคำแนะนำมาปรับปรุงให้ข้อโต้แย้งสมบูรณ์ขึ้น" : status === "reject" ? "ข้อมูลเดิมครอบคลุมประเด็นนี้แล้ว" : "นำเฉพาะประเด็นเรื่องตัวเลขมาปรับใช้"),
+        // The justification is the student's own reasoning; never pre-filled.
+        justificationText: prev[key]?.justificationText ?? "",
         createdAt: new Date().toISOString(),
       },
     }));
@@ -83,11 +79,23 @@ export function Phase6Revision({
     }));
   }
 
+  const aiKey = "ai-coach-feedback";
+  const requiredKeys = [
+    ...(initialFeedback ? [aiKey] : []),
+    ...peerReviews.map((rev, idx) => `peer-feedback-${rev.id || idx}`),
+  ];
+  const undecided = requiredKeys.filter((key) => !feedbackDecisions[key]?.status || !feedbackDecisions[key]?.justificationText.trim());
+  const canSubmit = !submitting && !revisedSubmission && !reviewsLoading && undecided.length === 0;
+
   async function submitRevision() {
+    if (!canSubmit) return;
     setSubmitting(true);
     setError("");
 
-    const decisionsList = Object.values(feedbackDecisions);
+    const decisionsList = requiredKeys.map((key) => ({
+      ...feedbackDecisions[key],
+      justificationText: feedbackDecisions[key].justificationText.trim(),
+    }));
 
     try {
       const response = await fetch("/api/sessions", {
@@ -113,8 +121,6 @@ export function Phase6Revision({
       setSubmitting(false);
     }
   }
-
-  const aiKey = "ai-coach-feedback";
 
   return (
     <div className="phase-container">
@@ -207,6 +213,18 @@ export function Phase6Revision({
           {/* Peer Feedback List with Decisions */}
           <div className="peer-feedback-list">
             <span className="feedback-origin-tag" style={{ marginBottom: "10px", display: "inline-block" }}>👥 ข้อเสนอแนะจากเพื่อนร่วมชั้น</span>
+            {reviewsLoading && <p className="muted-text">กำลังโหลดข้อเสนอแนะจากเพื่อน…</p>}
+            {reviewsError && (
+              <div role="alert">
+                <p className="error-text">{reviewsError}</p>
+                <button type="button" className="secondary-button compact-button" onClick={() => void loadReceivedReviews()}>
+                  ลองใหม่
+                </button>
+              </div>
+            )}
+            {!reviewsLoading && !reviewsError && peerReviews.length === 0 && (
+              <p className="muted-text">ยังไม่มีเพื่อนประเมินงานของคุณ ปรับปรุงงานจากคำแนะนำของ AI Coach ได้เลย</p>
+            )}
             {peerReviews.map((rev, idx) => {
               const peerKey = `peer-feedback-${rev.id || idx}`;
               const itemText = rev.suggestions || rev.feedback;
@@ -316,10 +334,13 @@ export function Phase6Revision({
             type="button"
             className="primary-button submit-btn"
             onClick={() => void submitRevision()}
-            disabled={submitting}
+            disabled={!canSubmit}
           >
-            {submitting ? "กำลังบันทึกฉบับปรับปรุง..." : "บันทึกและยืนยันข้อโต้แย้งฉบับสมบูรณ์ (Version 2)"}
+            {submitting ? "กำลังบันทึกฉบับปรับปรุง..." : revisedSubmission ? "✓ บันทึกแล้ว" : "บันทึกและยืนยันข้อโต้แย้งฉบับสมบูรณ์ (Version 2)"}
           </button>
+          {!revisedSubmission && undecided.length > 0 && (
+            <p className="small-note">เลือก ยอมรับ / ปฏิเสธ / ปรับแก้ และเขียนเหตุผลของคุณเองให้ครบทุกข้อเสนอแนะก่อนบันทึก</p>
+          )}
 
           {revisedSubmission && (
             <div className="success-banner revision-success">
@@ -343,6 +364,7 @@ export function Phase6Revision({
             if (revisedSubmission) onNext(revisedSubmission);
             else void submitRevision();
           }}
+          disabled={!revisedSubmission && !canSubmit}
         >
           {revisedSubmission ? "ไปสะท้อนคิดและสรุปบทเรียน ➔ (Phase 7)" : "บันทึกและไป Phase 7 ➔"}
         </button>

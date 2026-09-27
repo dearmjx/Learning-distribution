@@ -9,20 +9,15 @@ interface Phase2Props {
 }
 
 export function Phase2Identification({ onNext, onBack, savedData }: Phase2Props) {
-  const [independent, setIndependent] = useState(
-    savedData?.independent ?? "การลดลงของประชากรงู (ผู้บริโภคอันดับสูงสุด)",
-  );
-  const [dependent, setDependent] = useState(
-    savedData?.dependent ?? "ประชากรหนูนา, กบ, หญ้า และปริมาณพลังงานในระบบ",
-  );
-  const [controlled, setControlled] = useState(
-    savedData?.controlled ?? "สภาพแวดล้อมทางกายภาพ (แสงแดด, ปริมาณน้ำฝน, อุณหภูมิ)",
-  );
-  const [hypothesis, setHypothesis] = useState(
-    savedData?.hypothesis ?? "หากประชากรงูลดลง ประชากรหนูจะเพิ่มขึ้นอย่างรวดเร็ว ส่งผลให้พืชผู้ผลิตลดลง และพลังงานถ่ายทอดลดลง",
-  );
+  // Students identify variables themselves; examples live only in placeholders (LOS-014).
+  const [independent, setIndependent] = useState(savedData?.independent ?? "");
+  const [dependent, setDependent] = useState(savedData?.dependent ?? "");
+  const [controlled, setControlled] = useState(savedData?.controlled ?? "");
+  const [hypothesis, setHypothesis] = useState(savedData?.hypothesis ?? "");
+  const complete = [independent, dependent, controlled, hypothesis].every((value) => value.trim().length > 0);
 
   function handleProceed() {
+    if (!complete) return;
     onNext({ independent, dependent, controlled, hypothesis });
   }
 
@@ -106,10 +101,11 @@ export function Phase2Identification({ onNext, onBack, savedData }: Phase2Props)
           <button type="button" className="secondary-button" onClick={onBack}>
             ← กลับไปดูสถานการณ์ (Phase 1)
           </button>
-          <button type="button" className="primary-button next-phase-btn" onClick={handleProceed}>
+          <button type="button" className="primary-button next-phase-btn" onClick={handleProceed} disabled={!complete}>
             บันทึกตัวแปร ➔ ไปสำรวจข้อมูลสืบเสาะ (Phase 3)
           </button>
         </div>
+        {!complete && <p className="small-note">กรอกตัวแปรทั้ง 3 ช่องและสมมติฐานของคุณเองก่อนไปขั้นต่อไป</p>}
       </div>
     </div>
   );

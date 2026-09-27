@@ -21,6 +21,7 @@ interface StudentWorkbenchProps {
 
 export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = {}) {
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [activityId, setActivityId] = useState("");
   const [persistenceMode, setPersistenceMode] = useState<"memory" | "supabase">("memory");
   const [classId, setClassId] = useState("biology-m4-class-a");
@@ -79,12 +80,18 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
 
   useEffect(() => {
     void fetch("/api/activities")
-      .then((res) => res.json())
-      .then((data: {
-        activities: Activity[];
-        persistence?: "memory" | "supabase";
-        session?: { studentId?: string | null; classId?: string };
-      }) => {
+      .then(async (res) => {
+        const data = (await res.json()) as {
+          activities?: Activity[];
+          persistence?: "memory" | "supabase";
+          session?: { studentId?: string | null; classId?: string };
+          error?: string;
+        };
+        // Never put a non-array into state: a failed request must show an error, not crash the page.
+        if (!res.ok || !Array.isArray(data.activities)) throw new Error(data.error ?? "โหลดกิจกรรมไม่สำเร็จ");
+        return data as typeof data & { activities: Activity[] };
+      })
+      .then((data) => {
         setActivities(data.activities);
         const selected = data.activities.find((item) => item.id === initialActivityId)?.id ?? data.activities[0]?.id ?? "";
         setActivityId(selected);
@@ -96,7 +103,8 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
           setPersistenceMode("memory");
         }
       })
-      .catch(() => setError("โหลดกิจกรรมไม่สำเร็จ"));
+      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "โหลดกิจกรรมไม่สำเร็จ"))
+      .finally(() => setActivitiesLoading(false));
   }, [initialActivityId]);
 
   const activity = useMemo(() => activities.find((item) => item.id === activityId), [activities, activityId]);
@@ -240,6 +248,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
       />
 
       {error && <p className="error-text global-error">{error}</p>}
+      {activitiesLoading && !error && <p className="muted-text">กำลังโหลดกิจกรรม…</p>}
 
       {/* Active Phase Content */}
       {activity && (

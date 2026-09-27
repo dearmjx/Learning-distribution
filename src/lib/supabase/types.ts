@@ -145,9 +145,9 @@ export interface Database {
         Relationships: [];
       };
       reflections: {
-        Row: { id: string; student_id: string; activity_id: string; profile_id: string | null; class_id: string | null; submission_id: string | null; conceptual_learning: string; inquiry_process_reflection: string; peer_review_experience: string | null; confidence_score: number; key_takeaway: string | null; completed_at: string };
-        Insert: { id?: string; student_id: string; activity_id: string; profile_id?: string | null; class_id?: string | null; submission_id?: string | null; conceptual_learning?: string; inquiry_process_reflection?: string; peer_review_experience?: string | null; confidence_score?: number; key_takeaway?: string | null; completed_at?: string };
-        Update: { student_id?: string; activity_id?: string; profile_id?: string | null; class_id?: string | null; submission_id?: string | null; conceptual_learning?: string; inquiry_process_reflection?: string; peer_review_experience?: string | null; confidence_score?: number; key_takeaway?: string | null };
+        Row: { id: string; student_id: string; activity_id: string; profile_id: string | null; class_id: string | null; submission_id: string | null; conceptual_learning: string; inquiry_process_reflection: string; peer_review_experience: string | null; confidence_score: number | null; key_takeaway: string | null; analytical_thinking_score: number | null; ai_literacy_score: number | null; reflection_text: string | null; key_learnings: string[] | null; confidence_rating: "low" | "medium" | "high" | null; completed_at: string };
+        Insert: { id?: string; student_id: string; activity_id: string; profile_id?: string | null; class_id?: string | null; submission_id?: string | null; conceptual_learning?: string; inquiry_process_reflection?: string; peer_review_experience?: string | null; confidence_score?: number | null; key_takeaway?: string | null; analytical_thinking_score?: number | null; ai_literacy_score?: number | null; reflection_text?: string | null; key_learnings?: string[] | null; confidence_rating?: "low" | "medium" | "high" | null; completed_at?: string };
+        Update: { student_id?: string; activity_id?: string; profile_id?: string | null; class_id?: string | null; submission_id?: string | null; conceptual_learning?: string; inquiry_process_reflection?: string; peer_review_experience?: string | null; confidence_score?: number | null; key_takeaway?: string | null; analytical_thinking_score?: number | null; ai_literacy_score?: number | null; reflection_text?: string | null; key_learnings?: string[] | null; confidence_rating?: "low" | "medium" | "high" | null; };
         Relationships: [];
       };
       teacher_reviews: {
@@ -184,6 +184,7 @@ export interface Database {
     Views: Record<string, never>;
     Functions: {
       get_assigned_peer_review_draft: { Args: { p_activity_id: string }; Returns: Json };
+      get_received_peer_reviews: { Args: { p_activity_id: string }; Returns: Json };
       submit_peer_review: { Args: { p_submission_id: string; p_peer_review_submission_id: string | null; p_activity_id: string; p_scores: PeerReviewScores; p_strengths: string; p_suggestions: string; p_feedback: string }; Returns: Json };
     };
     Enums: Record<string, never>;

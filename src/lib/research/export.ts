@@ -37,7 +37,7 @@ export interface ResearchParticipantRecord {
   aiChatTurns: number;
   aiOpponentTurns: number;
   aiChatTotalTokens: number | null;
-  aiChatHintCost: number;
+  aiChatHintCost: number | null;
   aiChatProvider: string;
   feedbackDecisionsCount: number;
   feedbackAcceptedCount: number;
@@ -67,7 +67,7 @@ export interface ResearchParticipantRecord {
   authorshipCopySimilarity: number | null;
   startTimestamp: string;
   endTimestamp: string;
-  totalDurationMinutes: number;
+  totalDurationMinutes: number | null;
 }
 
 export interface BuildWideDatasetOptions {
@@ -157,10 +157,11 @@ export function buildWideResearchDataset(options: BuildWideDatasetOptions): Rese
     const reflection = reflections.find((r) => r.studentId === studentId && r.activityId === activityId);
     const authorship = finalDraft ? authorshipBySubmission[finalDraft.id] : undefined;
 
-    const start = studentEvents[0]?.occurredAt ?? draft1?.submittedAt ?? new Date().toISOString();
+    const start = studentEvents[0]?.occurredAt ?? draft1?.submittedAt ?? "";
     const end = studentEvents[studentEvents.length - 1]?.occurredAt ?? finalDraft?.submittedAt ?? start;
-    const durationMs = Math.max(0, new Date(end).getTime() - new Date(start).getTime());
-    const durationMin = Number((durationMs / 60000).toFixed(1));
+    const durationMin = start && end
+      ? Number((Math.max(0, new Date(end).getTime() - new Date(start).getTime()) / 60000).toFixed(1))
+      : null;
 
     const classroomName = studentId.includes("402") || studentId.includes("4-2") ? "M.4/2" : "M.4/1";
     const cycle: PaorCycle | null = finalDraft?.cycle ?? draft1?.cycle ?? activityCycles[activityId] ?? null;
@@ -177,11 +178,11 @@ export function buildWideResearchDataset(options: BuildWideDatasetOptions): Rese
       draft1Claim: draft1?.content?.claim ?? "",
       draft1Evidence: draft1?.content?.evidence ?? "",
       draft1Reasoning: draft1?.content?.reasoning ?? "",
-      draft1FrozenAt: draft1?.draft1FrozenAt ?? draft1?.submittedAt ?? "",
+      draft1FrozenAt: draft1?.draft1FrozenAt ?? "",
       aiChatTurns: chatEvents.length,
       aiOpponentTurns: opponentEvents.length,
       aiChatTotalTokens: chatTokens,
-      aiChatHintCost: draft1?.hintCost ?? 0,
+      aiChatHintCost: draft1?.hintCost ?? null,
       aiChatProvider: typeof aiFeedbackEvents[0]?.payload?.provider === "string" ? aiFeedbackEvents[0].payload.provider : "",
       feedbackDecisionsCount: feedbackDecisions.length,
       feedbackAcceptedCount: acceptedCount,
@@ -206,7 +207,7 @@ export function buildWideResearchDataset(options: BuildWideDatasetOptions): Rese
       reflectionSelfScoreAILiteracy: reflection?.aiLiteracyScore ?? null,
       reflectionConfidence: reflection?.confidenceRating ?? "",
       reflectionText: reflection?.reflectionText ?? reflection?.conceptualLearning ?? "",
-      authorshipStatus: authorship?.status ?? "none",
+      authorshipStatus: authorship?.status ?? "",
       authorshipResponseTimeSec: finalDraft?.responseTimeSeconds ?? null,
       authorshipCopySimilarity: authorship?.copySimilarityToPrompt ?? null,
       startTimestamp: start,
@@ -282,7 +283,7 @@ export function formatResearchWideDatasetCsv(records: ResearchParticipantRecord[
       r.aiChatTurns,
       r.aiOpponentTurns,
       num(r.aiChatTotalTokens),
-      r.aiChatHintCost,
+      num(r.aiChatHintCost),
       escapeCsv(r.aiChatProvider),
       r.feedbackDecisionsCount,
       r.feedbackAcceptedCount,
@@ -312,7 +313,7 @@ export function formatResearchWideDatasetCsv(records: ResearchParticipantRecord[
       num(r.authorshipCopySimilarity),
       escapeCsv(r.startTimestamp),
       escapeCsv(r.endTimestamp),
-      r.totalDurationMinutes,
+      num(r.totalDurationMinutes),
     ].join(","),
   );
 

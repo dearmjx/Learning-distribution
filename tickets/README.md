@@ -21,7 +21,7 @@ Lightweight file-based tracker. One file per ticket: `LOS-NNN-slug.md`.
 | [LOS-013](LOS-013-enforce-strict-guardrail-on-coach-chat.md) | P0 | done | Enforce strict Socratic guardrail on Coach chat replies | safety |
 | [LOS-011](LOS-011-ai-opponent-role-audit-gap-7.md) | P2 | done | AI Opponent role (audit gap #7) | feature |
 | [LOS-012](LOS-012-automated-pre-post-draft-1-vs.md) | P2 | done | Automated pre/post (Draft 1 vs Final) analytics (audit gap #10) | feature |
-| [LOS-014](LOS-014-research-data-integrity-remove-fabricated-student.md) | P0 | open | Research-data integrity: remove fabricated student content | research-validity |
+| [LOS-014](LOS-014-research-data-integrity-remove-fabricated-student.md) | P0 | done | Research-data integrity: remove fabricated student content | research-validity |
 | [LOS-015](LOS-015-database-hardening-pagination-immutability-consent-de.md) | P0 | open | Database hardening: pagination, immutability, consent, de-identification | data-integrity |
 | [LOS-016](LOS-016-workflow-state-and-resilience.md) | P1 | open | Workflow state and resilience | correctness |
 | [LOS-017](LOS-017-ai-operations-timeout-real-model-check.md) | P1 | open | AI operations: timeout, real-model check, stronger guardrail | ai-safety |

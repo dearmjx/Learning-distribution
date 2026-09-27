@@ -15,10 +15,11 @@ export async function GET(request: Request) {
     const activity = await repository.getActivity(activityId);
     if (!activity) return Response.json({ error: "ไม่พบกิจกรรมที่ระบุ" }, { status: 404 });
     const studentId = identity.context.studentId!;
-    if (!activity.peerReviewAllowed) return Response.json({ peerDraft: null, assignedDraft: null, myReviews: [], peerReviewAllowed: false });
+    if (!activity.peerReviewAllowed) return Response.json({ peerDraft: null, assignedDraft: null, myReviews: [], receivedReviews: [], peerReviewAllowed: false });
 
     const peerDraft = await repository.getAssignedPeerReviewDraft(studentId, activityId);
     const myReviews = await repository.listPeerReviews(undefined, studentId);
+    const receivedReviews = await repository.listReceivedPeerReviews(activityId);
     if (peerDraft) {
       await appendPersistedLearningEvent(repository, {
         studentId,
@@ -30,7 +31,10 @@ export async function GET(request: Request) {
         idempotencyKey: `peer-assignment:${studentId}:${peerDraft.id}`,
       });
     }
-    return Response.json({ peerDraft: peerDraft ?? null, assignedDraft: peerDraft ?? null, myReviews, peerReviewAllowed: true });
+    return Response.json(
+      { peerDraft: peerDraft ?? null, assignedDraft: peerDraft ?? null, myReviews, receivedReviews, peerReviewAllowed: true },
+      { headers: { "Cache-Control": "no-store, private" } },
+    );
   } catch (error) {
     if (error instanceof Error && /scope denied|identity is controlled|Student scope required/.test(error.message)) return Response.json({ error: error.message }, { status: 403 });
     return authErrorResponse(error);
@@ -63,7 +67,7 @@ export async function POST(request: Request) {
       scores: parsed.data.scores,
       strengths: parsed.data.strengths,
       suggestions: parsed.data.suggestions,
-      feedback: parsed.data.feedback || `[จุดเด่น]: ${parsed.data.strengths}\n[ข้อเสนอแนะ]: ${parsed.data.suggestions}`,
+      feedback: parsed.data.feedback ?? "",
     });
 
     const eventKey = request.headers.get("Idempotency-Key") ?? `peer-review:${studentId}:${assigned.id}`;

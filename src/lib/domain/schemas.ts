@@ -129,9 +129,10 @@ export const peerReviewInputSchema = z.object({
   submissionId: z.string().min(1),
   authorStudentId: z.string().optional(),
   peerReviewSubmissionId: z.string().optional(),
-  scores: peerReviewScoresSchema.default({ claim: 3, evidence: 3, reasoning: 3 }),
-  strengths: z.string().max(4000).default(""),
-  suggestions: z.string().max(4000).default(""),
+  // Research data: the reviewer must score and write feedback themselves (LOS-014).
+  scores: peerReviewScoresSchema,
+  strengths: z.string().trim().min(1).max(4000),
+  suggestions: z.string().trim().min(1).max(4000),
   feedback: z.string().max(8000).optional(),
 });
 

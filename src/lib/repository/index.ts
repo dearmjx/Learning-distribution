@@ -88,6 +88,13 @@ class MemoryScopedLearningRepository implements ScopedLearningRepository {
   async listPeerReviews(submissionId?: string, reviewerStudentId?: string): Promise<PeerReview[]> {
     return memory.listPeerReviews(submissionId, this.identity.context.role === "student" ? this.studentId(reviewerStudentId) : reviewerStudentId);
   }
+  async listReceivedPeerReviews(activityId: string): Promise<PeerReview[]> {
+    const authorId = this.studentId();
+    return memory
+      .listPeerReviews()
+      .filter((review) => review.authorStudentId === authorId && (!review.activityId || review.activityId === activityId))
+      .map((review) => ({ ...review, reviewerStudentId: "เพื่อนร่วมชั้น (ไม่ระบุชื่อ)" }));
+  }
   async getAssignedPeerReviewDraft(studentId: string, activityId: string): Promise<PeerReviewSubmission | undefined> {
     return memory.getAssignedPeerReviewDraft(this.studentId(studentId), activityId);
   }

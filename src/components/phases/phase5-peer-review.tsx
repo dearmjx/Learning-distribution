@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Activity, PeerReviewSubmission } from "@/lib/domain/types";
 
 interface Phase5Props {
@@ -16,50 +16,47 @@ export function Phase5PeerReview({ activity, studentId = "demo-student-01", onNe
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [submittedReview, setSubmittedReview] = useState(false);
+  const [peerReviewEnabled, setPeerReviewEnabled] = useState(true);
 
-  // Rubric scores & feedback
-  const [claimScore, setClaimScore] = useState(4);
-  const [evidenceScore, setEvidenceScore] = useState(3);
-  const [reasoningScore, setReasoningScore] = useState(3);
+  // Rubric scores & feedback: all start empty and must come from the reviewer (LOS-014).
+  const [claimScore, setClaimScore] = useState<number | null>(null);
+  const [evidenceScore, setEvidenceScore] = useState<number | null>(null);
+  const [reasoningScore, setReasoningScore] = useState<number | null>(null);
   const [strengths, setStrengths] = useState("");
   const [suggestions, setSuggestions] = useState("");
-  const [feedbackText, setFeedbackText] = useState("");
+
+  const loadAssignment = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/peer-reviews?activityId=${encodeURIComponent(activity.id)}`);
+      const data = (await res.json()) as { assignedDraft?: PeerReviewSubmission | null; peerReviewAllowed?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "โหลดงานของเพื่อนไม่สำเร็จ");
+      setPeerReviewEnabled(data.peerReviewAllowed !== false);
+      setPeerDraft(data.assignedDraft ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "โหลดงานของเพื่อนไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
+  }, [activity.id]);
 
   useEffect(() => {
-    void fetch(`/api/peer-reviews?activityId=${activity.id}&studentId=${encodeURIComponent(studentId)}`)
-      .then((res) => res.json())
-      .then((data: { assignedDraft?: PeerReviewSubmission; error?: string }) => {
-        if (data.assignedDraft) {
-          setPeerDraft(data.assignedDraft);
-        } else {
-          // Fallback realistic synthetic draft
-          setPeerDraft({
-            id: "synthetic-peer-01",
-            submissionId: "sub-synthetic-01",
-            authorStudentId: "peer-student-02",
-            activityId: activity.id,
-            anonymousAuthorAlias: "นักเรียนนิรนาม A-14",
-            content: {
-              claim: "ถ้าประชากรงูลดลง จำนวนหนูนาจะเพิ่มขึ้น และพลังงานในระบบนิเวศจะหมุนเวียนกลับมาเป็น 100% เท่าเดิม",
-              evidence: "จากข้อมูลพบว่าเมื่อไม่มีงู หนูนาจะไม่มีผู้ล่า จำนวนประชากรหนูจึงเพิ่มขึ้นจากเดิม 2 เท่า",
-              reasoning: "เนื่องจากพลังงานสามารถหมุนเวียนถ่ายทอดกลับไปมาระหว่างสิ่งมีชีวิตได้เรื่อยๆ โดยไม่มีการสูญหาย",
-            },
-            submittedAt: new Date().toISOString(),
-            isSynthetic: true,
-            misconceptionTag: "energy_cycling",
-          });
-        }
-      })
-      .catch(() => setError("โหลดงานของเพื่อนไม่สำเร็จ"))
-      .finally(() => setLoading(false));
-  }, [activity.id, studentId]);
+    void loadAssignment();
+  }, [loadAssignment]);
+
+  const missing = [
+    claimScore === null && "คะแนน Claim",
+    evidenceScore === null && "คะแนน Evidence",
+    reasoningScore === null && "คะแนน Reasoning",
+    !strengths.trim() && "จุดเด่น",
+    !suggestions.trim() && "ข้อเสนอแนะ",
+  ].filter(Boolean) as string[];
+  // Next is allowed only after a real review, or when there is nothing to review.
+  const canProceed = submittedReview || (!loading && !error && (!peerReviewEnabled || !peerDraft));
 
   async function submitReview() {
-    if (!peerDraft) return;
-    const combinedFeedback = feedbackText.trim()
-      ? feedbackText
-      : `[จุดเด่น]: ${strengths || "ระบุประชากรหนูชัดเจน"} | [ข้อเสนอแนะ]: ${suggestions || "ควรตรวจสอบว่าพลังงานหมุนเวียนได้จริงหรือไม่ หรือสูญเสียเป็นความร้อนตามกฎ 10%"}`;
-
+    if (!peerDraft || missing.length > 0 || submittedReview) return;
     setSubmitting(true);
     setError("");
 
@@ -74,14 +71,13 @@ export function Phase5PeerReview({ activity, studentId = "demo-student-01", onNe
           peerReviewSubmissionId: peerDraft.id,
           authorStudentId: peerDraft.authorStudentId,
           activityId: activity.id,
-          feedback: combinedFeedback,
           scores: {
             claim: claimScore,
             evidence: evidenceScore,
             reasoning: reasoningScore,
           },
-          strengths: strengths || "ระบุข้อค้นพบชัดเจน",
-          suggestions: suggestions || "ควรเพิ่มรายละเอียดเรื่องกฎ 10%",
+          strengths: strengths.trim(),
+          suggestions: suggestions.trim(),
         }),
       });
 
@@ -107,6 +103,30 @@ export function Phase5PeerReview({ activity, studentId = "demo-student-01", onNe
 
       {loading && <p className="muted-text">กำลังค้นหาข้อโต้แย้งของเพื่อนในระบบ…</p>}
 
+      {error && !peerDraft && (
+        <div className="card content-card" role="alert">
+          <p className="error-text">{error}</p>
+          <button type="button" className="secondary-button compact-button" onClick={() => void loadAssignment()}>
+            ลองใหม่
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && !peerDraft && (
+        <div className="card content-card">
+          <p className="muted-text">
+            {peerReviewEnabled
+              ? "ยังไม่มีงานของเพื่อนที่พร้อมให้ประเมินในตอนนี้ ลองกลับมาอีกครั้งเมื่อเพื่อนส่ง Draft 1 แล้ว หรือไปขั้นต่อไปได้"
+              : "กิจกรรมนี้ไม่ได้เปิดการประเมินเพื่อน ไปขั้นต่อไปได้เลย"}
+          </p>
+          {peerReviewEnabled && (
+            <button type="button" className="secondary-button compact-button" onClick={() => void loadAssignment()}>
+              ตรวจสอบอีกครั้ง
+            </button>
+          )}
+        </div>
+      )}
+
       {peerDraft && (
         <div className="grid-2-col">
           {/* Peer Draft Display */}
@@ -116,7 +136,7 @@ export function Phase5PeerReview({ activity, studentId = "demo-student-01", onNe
                 <p className="eyebrow">ANONYMIZED PEER ARGUMENT</p>
                 <h3>ผลงานของ: {peerDraft.anonymousAuthorAlias}</h3>
               </div>
-              <span className="anon-badge">🔒 ซ่อนชื่อผู้ส่ง</span>
+              <span className="anon-badge">{peerDraft.isSynthetic ? "📘 งานตัวอย่าง (ไม่ใช่ของเพื่อนจริง)" : "🔒 ซ่อนชื่อผู้ส่ง"}</span>
             </div>
 
             <div className="peer-cer-display">
@@ -167,38 +187,28 @@ export function Phase5PeerReview({ activity, studentId = "demo-student-01", onNe
             ) : (
               <div className="review-form-body">
                 <div className="rubric-sliders">
-                  <div className="rubric-row">
-                    <label>Claim ตรงประเด็น ({claimScore}/5):</label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="5"
-                      value={claimScore}
-                      onChange={(e) => setClaimScore(Number(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="rubric-row">
-                    <label>Evidence มีตัวเลขหลักฐาน ({evidenceScore}/5):</label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="5"
-                      value={evidenceScore}
-                      onChange={(e) => setEvidenceScore(Number(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="rubric-row">
-                    <label>Reasoning อธิบายกลไกถูกต้อง ({reasoningScore}/5):</label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="5"
-                      value={reasoningScore}
-                      onChange={(e) => setReasoningScore(Number(e.target.value))}
-                    />
-                  </div>
+                  {([
+                    ["Claim ตรงประเด็น", claimScore, setClaimScore],
+                    ["Evidence มีตัวเลขหลักฐาน", evidenceScore, setEvidenceScore],
+                    ["Reasoning อธิบายกลไกถูกต้อง", reasoningScore, setReasoningScore],
+                  ] as const).map(([label, value, setValue]) => (
+                    <div className="rubric-row" key={label} role="group" aria-label={label}>
+                      <span className="form-label">{label} ({value ?? "ยังไม่เลือก"}/5):</span>
+                      <div className="radio-group-row">
+                        {[1, 2, 3, 4, 5].map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            className={`radio-pill-btn ${value === level ? "pill-selected" : ""}`}
+                            aria-pressed={value === level}
+                            onClick={() => setValue(level)}
+                          >
+                            {level}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="form-group">
@@ -233,10 +243,11 @@ export function Phase5PeerReview({ activity, studentId = "demo-student-01", onNe
                   type="button"
                   className="primary-button submit-btn"
                   onClick={() => void submitReview()}
-                  disabled={submitting}
+                  disabled={submitting || missing.length > 0}
                 >
                   {submitting ? "กำลังบันทึก..." : "ส่งการประเมินให้เพื่อน"}
                 </button>
+                {missing.length > 0 && <p className="small-note">กรุณากรอกให้ครบก่อนส่ง: {missing.join(", ")}</p>}
 
                 {error && <p className="error-text">{error}</p>}
               </div>
@@ -253,7 +264,7 @@ export function Phase5PeerReview({ activity, studentId = "demo-student-01", onNe
           type="button"
           className="primary-button next-phase-btn"
           onClick={onNext}
-          disabled={!submittedReview && !peerDraft}
+          disabled={!canProceed}
         >
           ไปปรับปรุงข้อโต้แย้งฉบับสมบูรณ์ ➔ (Phase 6)
         </button>

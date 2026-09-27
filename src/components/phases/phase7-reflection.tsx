@@ -19,13 +19,12 @@ const CONCEPTS_CHECKLIST = [
 ];
 
 export function Phase7Reflection({ activity, studentId = "demo-student-01", onBack }: Phase7Props) {
-  const [analyticalScore, setAnalyticalScore] = useState(4);
-  const [aiLiteracyScore, setAiLiteracyScore] = useState(5);
-  const [confidence, setConfidence] = useState<"low" | "medium" | "high">("high");
-  const [reflectionText, setReflectionText] = useState(
-    "การทำกิจกรรมทำให้เข้าใจชัดเจนว่าเมื่อผู้ล่าลดลง จะกระทบต่อโครงสร้างประชากรและพลังงานทั้งระบบ และการที่ AI Coach ถามนำทำให้ต้องคิดหาหลักฐานมาสนับสนุนเองแทนที่จะรอคำตอบ",
-  );
-  const [selectedConcepts, setSelectedConcepts] = useState<string[]>(CONCEPTS_CHECKLIST);
+  // Research instrument: every answer starts empty and must come from the student (LOS-014).
+  const [analyticalScore, setAnalyticalScore] = useState<number | null>(null);
+  const [aiLiteracyScore, setAiLiteracyScore] = useState<number | null>(null);
+  const [confidence, setConfidence] = useState<"low" | "medium" | "high" | null>(null);
+  const [reflectionText, setReflectionText] = useState("");
+  const [selectedConcepts, setSelectedConcepts] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -38,7 +37,15 @@ export function Phase7Reflection({ activity, studentId = "demo-student-01", onBa
     }
   }
 
+  const missing = [
+    analyticalScore === null && "คะแนนการคิดวิเคราะห์",
+    aiLiteracyScore === null && "คะแนนการใช้ AI",
+    confidence === null && "ระดับความมั่นใจ",
+    !reflectionText.trim() && "ข้อความสะท้อนคิด",
+  ].filter(Boolean) as string[];
+
   async function submitReflection() {
+    if (missing.length > 0 || submitted) return;
     setSubmitting(true);
     setError("");
 
@@ -89,27 +96,27 @@ export function Phase7Reflection({ activity, studentId = "demo-student-01", onBa
           </div>
 
           <div className="rubric-sliders">
-            <div className="rubric-row">
-              <label>ความมั่นใจในการคิดวิเคราะห์ทางวิทยาศาสตร์ ({analyticalScore}/5):</label>
-              <input
-                type="range"
-                min="1"
-                max="5"
-                value={analyticalScore}
-                onChange={(e) => setAnalyticalScore(Number(e.target.value))}
-              />
-            </div>
-
-            <div className="rubric-row">
-              <label>ความเข้าใจในการใช้ AI Coach อย่างสร้างสรรค์ ({aiLiteracyScore}/5):</label>
-              <input
-                type="range"
-                min="1"
-                max="5"
-                value={aiLiteracyScore}
-                onChange={(e) => setAiLiteracyScore(Number(e.target.value))}
-              />
-            </div>
+            {([
+              ["ความมั่นใจในการคิดวิเคราะห์ทางวิทยาศาสตร์", analyticalScore, setAnalyticalScore],
+              ["ความเข้าใจในการใช้ AI Coach อย่างสร้างสรรค์", aiLiteracyScore, setAiLiteracyScore],
+            ] as const).map(([label, value, setValue]) => (
+              <div className="rubric-row" key={label} role="group" aria-label={label}>
+                <span className="form-label">{label} ({value ?? "ยังไม่เลือก"}/5):</span>
+                <div className="radio-group-row">
+                  {[1, 2, 3, 4, 5].map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      className={`radio-pill-btn ${value === level ? "pill-selected" : ""}`}
+                      aria-pressed={value === level}
+                      onClick={() => setValue(level)}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="form-group">
@@ -122,6 +129,7 @@ export function Phase7Reflection({ activity, studentId = "demo-student-01", onBa
                   key={lvl}
                   type="button"
                   className={`radio-pill-btn ${confidence === lvl ? "pill-selected" : ""}`}
+                  aria-pressed={confidence === lvl}
                   onClick={() => setConfidence(lvl)}
                 >
                   {lvl === "low" ? "🌱 เริ่มเข้าใจ" : lvl === "medium" ? "🌿 ปานกลาง" : "🌳 มั่นใจมาก"}
@@ -169,10 +177,13 @@ export function Phase7Reflection({ activity, studentId = "demo-student-01", onBa
             type="button"
             className="primary-button submit-btn"
             onClick={() => void submitReflection()}
-            disabled={submitting}
+            disabled={submitting || submitted || missing.length > 0}
           >
-            {submitting ? "กำลังบันทึก..." : "ส่งการสะท้อนคิดและเสร็จสิ้นกระบวนการ ADI"}
+            {submitting ? "กำลังบันทึก..." : submitted ? "✓ ส่งแล้ว" : "ส่งการสะท้อนคิดและเสร็จสิ้นกระบวนการ ADI"}
           </button>
+          {!submitted && missing.length > 0 && (
+            <p className="small-note">กรุณากรอกให้ครบก่อนส่ง: {missing.join(", ")}</p>
+          )}
 
           {error && <p className="error-text">{error}</p>}
         </div>
@@ -196,8 +207,6 @@ export function Phase7Reflection({ activity, studentId = "demo-student-01", onBa
               </p>
               <div className="cert-stats">
                 <div><span>กระบวนการ</span><strong>7 Phases</strong></div>
-                <div><span>ข้อโต้แย้ง</span><strong>2 Versions (CER)</strong></div>
-                <div><span>ประเมินเพื่อน</span><strong>1 Peer Review</strong></div>
                 <div><span>สถานะ</span><strong className="status-done">บันทึกสำเร็จ</strong></div>
               </div>
               <div className="cert-links">
