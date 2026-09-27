@@ -570,3 +570,14 @@ Commands run and actual results:
 - `npm.cmd run build` → PASSED (24 routes compiled cleanly, exit code 0).
 
 Next action: LOS-009 (Live end-to-end verification against live Supabase + local Ollama).
+
+## LOS-009 — Live end-to-end verification check — 2026-09-26
+
+Status: BLOCKED (`in-progress`).
+
+Live service probes run in this session (secret values never printed):
+- Local Ollama probe (`GET http://localhost:11434/v1/models` and MCP `ollama_list_models`) → **BLOCKED** (`ECONNREFUSED`; local Ollama daemon is not running on port `11434`).
+- Live Supabase REST probe (`GET <NEXT_PUBLIC_SUPABASE_URL>/rest/v1/schools?select=id&limit=1`) → **BLOCKED** (`ENOTFOUND`; DNS lookup failed for the Supabase project URL configured in `.env.local`).
+- Local Supabase CLI check (`Get-Command supabase`) → **BLOCKED** (`supabase` CLI is not installed on PATH and `supabase/config.toml` is absent, so `supabase test db` cannot be executed locally).
+
+`LEARNING_PERSISTENCE=memory` remains the default until live Ollama and a reachable Supabase instance (with migrations `001`–`010` applied) are available.
