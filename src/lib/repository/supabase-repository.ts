@@ -28,6 +28,26 @@ function assertStudentScope(scope: SupabaseRepositoryScope, studentId: string | 
   }
 }
 
+/**
+ * Supabase caps a response at 1000 rows by default. Research reads must never be
+ * silently truncated, so list queries page through with `.range()` (LOS-015 A7).
+ */
+const PAGE_SIZE = 1000;
+
+interface RangeableQuery<Row> {
+  range(from: number, to: number): PromiseLike<{ data: Row[] | null; error: { message: string } | null }>;
+}
+
+async function fetchAllPages<Row>(query: RangeableQuery<Row>): Promise<{ data: Row[]; error: { message: string } | null }> {
+  const rows: Row[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
+    if (error) return { data: rows, error };
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
 function mapSubmission(data: Database["public"]["Tables"]["submissions"]["Row"]): Submission {
   return {
     id: data.id,
@@ -46,6 +66,7 @@ function mapSubmission(data: Database["public"]["Tables"]["submissions"]["Row"])
     draft1Frozen: data.draft1_frozen ?? undefined,
     draft1FrozenAt: data.draft1_frozen_at ?? undefined,
     feedbackDecisions: data.feedback_decisions ?? undefined,
+    classId: data.class_id ?? undefined,
   };
 }
 
@@ -232,11 +253,12 @@ export class SupabaseRepository implements ScopedLearningRepository {
 
   async listSubmissions(studentId?: string, activityId?: string): Promise<Submission[]> {
     assertStudentScope(this.scope, studentId);
-    let query = this.client.from("submissions").select().order("submitted_at", { ascending: false });
+    let query = this.client.from("submissions").select().order("submitted_at", { ascending: false }).order("id");
     if (this.scope.context.role === "student") query = query.eq("student_id", this.scope.context.studentId!);
+    else query = query.eq("class_id", this.scope.context.classId);
     if (studentId && this.scope.context.role !== "student") query = query.eq("student_id", studentId);
     if (activityId) query = query.eq("activity_id", activityId);
-    const { data, error } = await query;
+    const { data, error } = await fetchAllPages(query);
     if (error) throw new Error(`Supabase submission list failed: ${error.message}`);
     return (data ?? []).map(mapSubmission);
   }
@@ -256,14 +278,13 @@ export class SupabaseRepository implements ScopedLearningRepository {
   }
 
   async updateSubmissionWorkflow(submissionId: string, workflowState: Submission["workflowState"]): Promise<Submission | undefined> {
-    const { data, error } = await this.client
-      .from("submissions")
-      .update({ workflow_state: workflowState })
-      .eq("id", submissionId)
-      .select()
-      .maybeSingle();
+    // Direct UPDATE on submissions is revoked (LOS-015 A8); state changes go through a scoped RPC.
+    const { error } = await this.client.rpc("set_submission_workflow_state", {
+      p_submission_id: submissionId,
+      p_workflow_state: workflowState,
+    });
     if (error) throw new Error(`Supabase submission update failed: ${error.message}`);
-    return data ? mapSubmission(data) : undefined;
+    return this.getSubmission(submissionId);
   }
 
   async addRevision(input: Omit<Revision, "id" | "createdAt">): Promise<Revision> {
@@ -292,7 +313,7 @@ export class SupabaseRepository implements ScopedLearningRepository {
   }
 
   async listRevisions(submissionId: string): Promise<Revision[]> {
-    const { data, error } = await this.client.from("revisions").select().eq("submission_id", submissionId).order("version");
+    const { data, error } = await fetchAllPages(this.client.from("revisions").select().eq("submission_id", submissionId).order("version").order("id"));
     if (error) throw new Error(`Supabase revision list failed: ${error.message}`);
     return (data ?? []).map(mapRevision);
   }
@@ -354,11 +375,11 @@ export class SupabaseRepository implements ScopedLearningRepository {
 
   async listInteractions(studentId: string, activityId?: string): Promise<AiInteraction[]> {
     assertStudentScope(this.scope, studentId);
-    let query = this.client.from("ai_interactions").select().order("created_at");
+    let query = this.client.from("ai_interactions").select().order("created_at").order("id");
     if (this.scope.context.role === "student") query = query.eq("student_id", this.scope.context.studentId!);
     else query = query.eq("student_id", studentId);
     if (activityId) query = query.eq("activity_id", activityId);
-    const { data, error } = await query;
+    const { data, error } = await fetchAllPages(query);
     if (error) throw new Error(`Supabase AI interaction list failed: ${error.message}`);
     return (data ?? []).map((item) => ({
       id: item.id,
@@ -398,13 +419,26 @@ export class SupabaseRepository implements ScopedLearningRepository {
 
   async listPeerReviews(submissionId?: string, reviewerStudentId?: string): Promise<PeerReview[]> {
     assertStudentScope(this.scope, reviewerStudentId);
-    let query = this.client.from("peer_reviews").select();
+    let query = this.client.from("peer_reviews").select().order("created_at").order("id");
     if (submissionId) query = query.eq("submission_id", submissionId);
     if (this.scope.context.role === "student") query = query.eq("reviewer_student_id", this.scope.context.studentId!);
-    else if (reviewerStudentId) query = query.eq("reviewer_student_id", reviewerStudentId);
-    const { data, error } = await query;
+    else {
+      query = query.eq("class_id", this.scope.context.classId);
+      if (reviewerStudentId) query = query.eq("reviewer_student_id", reviewerStudentId);
+    }
+    const { data, error } = await fetchAllPages(query);
     if (error) throw new Error(`Supabase peer-review list failed: ${error.message}`);
     return (data ?? []).map(mapPeerReview);
+  }
+
+  async listConsentedStudentIds(purpose: string): Promise<string[] | null> {
+    if (this.scope.context.role === "student") throw new Error("Teacher scope required");
+    const { data, error } = await this.client.rpc("consented_student_ids", {
+      p_class_id: this.scope.context.classId,
+      p_purpose: purpose,
+    });
+    if (error) throw new Error(`Supabase consent lookup failed: ${error.message}`);
+    return Array.isArray(data) ? data.map(String) : [];
   }
 
   async listReceivedPeerReviews(activityId: string): Promise<PeerReview[]> {
@@ -468,11 +502,14 @@ export class SupabaseRepository implements ScopedLearningRepository {
 
   async listReflections(studentId?: string, activityId?: string): Promise<StudentReflectionData[]> {
     assertStudentScope(this.scope, studentId);
-    let query = this.client.from("reflections").select();
+    let query = this.client.from("reflections").select().order("completed_at").order("id");
     if (this.scope.context.role === "student") query = query.eq("student_id", this.scope.context.studentId!);
-    else if (studentId) query = query.eq("student_id", studentId);
+    else {
+      query = query.eq("class_id", this.scope.context.classId);
+      if (studentId) query = query.eq("student_id", studentId);
+    }
     if (activityId) query = query.eq("activity_id", activityId);
-    const { data, error } = await query;
+    const { data, error } = await fetchAllPages(query);
     if (error) throw new Error(`Supabase reflection list failed: ${error.message}`);
     return (data ?? []).map(mapReflection);
   }
@@ -500,9 +537,10 @@ export class SupabaseRepository implements ScopedLearningRepository {
   }
 
   async listTeacherReviews(submissionId?: string): Promise<TeacherReview[]> {
-    let query = this.client.from("teacher_reviews").select().order("created_at", { ascending: false });
+    let query = this.client.from("teacher_reviews").select().order("created_at", { ascending: false }).order("id");
     if (submissionId) query = query.eq("submission_id", submissionId);
-    const { data, error } = await query;
+    if (this.scope.context.role !== "student") query = query.eq("class_id", this.scope.context.classId);
+    const { data, error } = await fetchAllPages(query);
     if (error) throw new Error(`Supabase teacher review list failed: ${error.message}`);
     return (data ?? []).map(mapTeacherReview);
   }
@@ -574,11 +612,14 @@ export class SupabaseRepository implements ScopedLearningRepository {
 
   async listLearningEvents(studentId?: string, activityId?: string): Promise<LearningEvent[]> {
     assertStudentScope(this.scope, studentId);
-    let query = this.client.from("learning_events").select().order("occurred_at", { ascending: false });
+    let query = this.client.from("learning_events").select().order("occurred_at", { ascending: false }).order("id");
     if (this.scope.context.role === "student") query = query.eq("student_id", this.scope.context.studentId!);
-    else if (studentId) query = query.eq("student_id", studentId);
+    else {
+      query = query.eq("class_id", this.scope.context.classId);
+      if (studentId) query = query.eq("student_id", studentId);
+    }
     if (activityId) query = query.eq("activity_id", activityId);
-    const { data, error } = await query;
+    const { data, error } = await fetchAllPages(query);
     if (error) throw new Error(`Supabase learning event list failed: ${error.message}`);
     return (data ?? []).map(mapEvent);
   }

@@ -3,6 +3,8 @@ import { buildWideResearchDataset } from "@/lib/research/export";
 import { buildGrowthSummary } from "@/lib/research/growth";
 import type { Submission, TeacherReview } from "@/lib/domain/types";
 
+const TEST_KEY_SECRET = "test-participant-key-secret";
+
 function sub(id: string, studentId: string, activityId: string, cycle: 1 | 2, version: number, claim: string): Submission {
   return {
     id,
@@ -47,7 +49,7 @@ describe("Pre/post growth summary (LOS-012)", () => {
     review("b3", [3, 3, 3, 3]), // 75%
     // c1 unreviewed: must not count as a score
   ];
-  const records = buildWideResearchDataset({ submissions, events: [], teacherReviews });
+  const records = buildWideResearchDataset({ participantKeySecret: TEST_KEY_SECRET, submissions, events: [], teacherReviews });
   const summary = buildGrowthSummary(records);
 
   it("summarizes each cycle without imputing unreviewed students", () => {

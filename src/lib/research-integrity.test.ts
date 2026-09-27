@@ -7,6 +7,8 @@ import { clearMemoryRepositoriesForTests } from "@/lib/repository/memory-reposit
 import { buildWideResearchDataset, deidentifyStudentKey, formatResearchWideDatasetCsv } from "@/lib/research/export";
 import type { Submission, TeacherReview } from "@/lib/domain/types";
 
+const TEST_KEY_SECRET = "test-participant-key-secret";
+
 const activityId = "ecosystem-food-web-01";
 
 function asTeacher(): void {
@@ -43,7 +45,7 @@ describe("Research data integrity (LOS-005/006/007)", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("exports blanks instead of imputed values for unreviewed, unreflected students", () => {
-    const [record] = buildWideResearchDataset({ submissions: [submission], events: [] });
+    const [record] = buildWideResearchDataset({ participantKeySecret: TEST_KEY_SECRET, submissions: [submission], events: [] });
     expect(record.teacherReviewed).toBe(false);
     expect(record.rubricDim1SelectInfo).toBeNull();
     expect(record.totalRubricScore).toBeNull();
@@ -60,9 +62,9 @@ describe("Research data integrity (LOS-005/006/007)", () => {
 
   it("takes cycle from data, never from the activity id text", () => {
     const energy = { ...submission, activityId: "ecosystem-energy-flow-01" };
-    const [unassigned] = buildWideResearchDataset({ submissions: [energy], events: [] });
+    const [unassigned] = buildWideResearchDataset({ participantKeySecret: TEST_KEY_SECRET, submissions: [energy], events: [] });
     expect(unassigned.cycle).toBeNull();
-    const [fromActivity] = buildWideResearchDataset({
+    const [fromActivity] = buildWideResearchDataset({ participantKeySecret: TEST_KEY_SECRET,
       submissions: [energy],
       events: [],
       activityCycles: { "ecosystem-energy-flow-01": 2 },
@@ -81,14 +83,14 @@ describe("Research data integrity (LOS-005/006/007)", () => {
       syntheticScores: { selectingInfo: 1, connectingInfo: 2, reconstructingLanguage: 3, directAnswering: 2 },
       createdAt: "2026-09-01T09:00:00.000Z",
     };
-    const [record] = buildWideResearchDataset({ submissions: [submission], events: [], teacherReviews: [review] });
+    const [record] = buildWideResearchDataset({ participantKeySecret: TEST_KEY_SECRET, submissions: [submission], events: [], teacherReviews: [review] });
     expect(record.teacherCerClaim).toBe(4);
     expect(record.rubricDim4DirectAnswer).toBe(2);
     expect(record.totalRubricScore).toBe(50);
   });
 
   it("gives distinct participant keys to non-numeric student ids", () => {
-    const keys = new Set(Array.from({ length: 200 }, (_, i) => deidentifyStudentKey(`student-${String.fromCharCode(97 + (i % 26))}${i}`)));
+    const keys = new Set(Array.from({ length: 200 }, (_, i) => deidentifyStudentKey(`student-${String.fromCharCode(97 + (i % 26))}${i}`, TEST_KEY_SECRET)));
     expect(keys.size).toBe(200);
   });
 

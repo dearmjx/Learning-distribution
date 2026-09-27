@@ -7,6 +7,8 @@ import { clearMemoryRepositoriesForTests, listReflections } from "@/lib/reposito
 import { buildWideResearchDataset } from "@/lib/research/export";
 import type { PeerReview, PeerReviewSubmission } from "@/lib/domain/types";
 
+const TEST_KEY_SECRET = "test-participant-key-secret";
+
 const activityId = "ecosystem-energy-flow-01"; // peer review enabled
 const json = { "Content-Type": "application/json" };
 
@@ -108,7 +110,7 @@ describe("LOS-014 research-data integrity", () => {
   });
 
   it("exports blanks for missing freeze time, hint cost, authorship and timing (A9)", () => {
-    const [record] = buildWideResearchDataset({
+    const [record] = buildWideResearchDataset({ participantKeySecret: TEST_KEY_SECRET,
       submissions: [{
         id: "s1", studentId: "x", activityId, content: { claim: "c", evidence: "e", reasoning: "r" },
         version: 1, submittedAt: "", hintDepth: "none", hintCost: undefined as unknown as number,

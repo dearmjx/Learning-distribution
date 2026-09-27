@@ -3,7 +3,7 @@
 
 BEGIN;
 
-SELECT plan(13);
+SELECT plan(18);
 
 CREATE TEMP TABLE phase9_ids (student_a UUID, student_b UUID, teacher_a UUID, teacher_b UUID, student_other UUID);
 INSERT INTO phase9_ids VALUES (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid());
@@ -60,9 +60,22 @@ SELECT throws_ok($sql$INSERT INTO submissions (student_id, activity_id, profile_
     '42501', NULL, 'student A cannot insert a submission for student B');
 SELECT throws_ok($sql$UPDATE learning_events SET payload = '{}'::jsonb$sql$, NULL, NULL, 'learning events have no update path');
 SELECT throws_ok($sql$SELECT * FROM research_identity_mapping$sql$, NULL, NULL, 'research identity mapping is more restricted than evidence');
+-- LOS-015 (migration 013): research content is immutable and consent is guardian/admin-managed.
+SELECT throws_ok($sql$UPDATE submissions SET content = '{"claim":"rewritten","evidence":"","reasoning":""}'::jsonb$sql$,
+    '42501', NULL, 'student A cannot rewrite their frozen Draft 1 through the API');
+SELECT throws_ok($sql$INSERT INTO learning_events (student_id, activity_id, profile_id, class_id, event_type, payload, correlation_id)
+    SELECT 'phase9-student-a', 'ecosystem-food-web-01', learning_profile_id(), 'biology-m4-class-a', 'teacher_reviewed', '{}'::jsonb, 'forged'$sql$,
+    '42501', NULL, 'student A cannot forge a teacher event');
+SELECT throws_ok($sql$INSERT INTO consent_records (profile_id, school_id, purpose, policy_version, status)
+    SELECT learning_profile_id(), 'demo-school-01', 'classroom_action_research', 'v1', 'granted'$sql$,
+    '42501', NULL, 'student A cannot grant their own research consent');
+SELECT lives_ok($sql$SELECT set_submission_workflow_state((SELECT id FROM submissions LIMIT 1), 'revising')$sql$,
+    'student A can advance their own workflow state through the RPC only');
 
 SELECT set_config('request.jwt.claim.sub', teacher_a::text, true) FROM phase9_ids;
 SELECT is((SELECT count(*)::int FROM submissions), 2, 'teacher sees both submissions in assigned class');
+SELECT is(cardinality(consented_student_ids('biology-m4-class-a', 'classroom_action_research')), 0,
+    'teacher consent lookup returns no students without guardian-recorded consent');
 SELECT is((SELECT count(*)::int FROM teacher_observation_notes), 1, 'teacher A sees only teacher A observation notes');
 SELECT is((SELECT min(teacher_id) FROM teacher_observation_notes), 'phase9-teacher-a', 'teacher A cannot read teacher B observation notes');
 SELECT throws_ok($sql$INSERT INTO teacher_observation_notes (teacher_id, teacher_profile_id, class_id, cycle, activity_id, phase, content)

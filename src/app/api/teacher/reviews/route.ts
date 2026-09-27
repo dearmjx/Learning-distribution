@@ -42,7 +42,7 @@ async function snapshot(repository: Awaited<ReturnType<typeof getLearningReposit
 
 export async function GET(request: Request) {
   try {
-    const identity = await resolveLearningIdentity({ requiredRole: "teacher" });
+    const identity = await resolveLearningIdentity({ requiredRole: "teacher", classId: new URL(request.url).searchParams.get("classId") ?? undefined });
     const repository = await getLearningRepository(identity);
     return Response.json(await snapshot(repository, identity.context.courseId), {
       headers: {
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   const parsed = teacherReviewInputSchema.safeParse(await request.json());
   if (!parsed.success) return Response.json({ error: "ข้อมูล teacher review ไม่ถูกต้อง", details: parsed.error.flatten() }, { status: 400 });
   try {
-    const identity = await resolveLearningIdentity({ requiredRole: "teacher" });
+    const identity = await resolveLearningIdentity({ requiredRole: "teacher", classId: new URL(request.url).searchParams.get("classId") ?? undefined });
     const repository = await getLearningRepository(identity);
     const submission = await repository.getSubmission(parsed.data.submissionId);
     if (!submission) return Response.json({ error: "ไม่พบ submission ใน class scope ของครู" }, { status: 404 });

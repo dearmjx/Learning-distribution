@@ -5,8 +5,10 @@ import type { FeedbackDecision } from "@/lib/domain/types";
 import { getLearningRepository, getPersistenceMode, getPersistenceStatus } from "@/lib/repository/index";
 import { clearMemoryRepositoriesForTests } from "@/lib/repository/memory-repository";
 import { createSupabaseRepository } from "@/lib/repository/supabase-repository";
-import { buildWideResearchDataset, formatResearchWideDatasetCsv } from "@/lib/research/export";
+import { buildWideResearchDataset, deidentifyStudentKey, formatResearchWideDatasetCsv } from "@/lib/research/export";
 import type { Database } from "@/lib/supabase/types";
+
+const TEST_KEY_SECRET = "test-participant-key-secret";
 
 function createFakeSupabaseClient(): SupabaseClient<Database> {
   const tables: Record<string, Array<Record<string, unknown>>> = {
@@ -36,6 +38,7 @@ function createFakeSupabaseClient(): SupabaseClient<Database> {
     const rows = () => (tables[table] ??= []);
     let filters: Array<(row: Record<string, unknown>) => boolean> = [];
     let pendingResult: Record<string, unknown> | null = null;
+    let window: [number, number] | null = null;
 
     const builder = {
       insert(payload: Record<string, unknown>) {
@@ -73,6 +76,10 @@ function createFakeSupabaseClient(): SupabaseClient<Database> {
       limit() {
         return builder;
       },
+      range(from: number, to: number) {
+        window = [from, to];
+        return builder;
+      },
       async single() {
         if (pendingResult) return { data: pendingResult, error: null };
         const matched = rows().filter((r) => filters.every((f) => f(r)));
@@ -88,7 +95,8 @@ function createFakeSupabaseClient(): SupabaseClient<Database> {
         onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
       ) {
         const matched = rows().filter((r) => filters.every((f) => f(r)));
-        return Promise.resolve({ data: matched, error: null }).then(onfulfilled, onrejected);
+        const page = window ? matched.slice(window[0], window[1] + 1) : matched;
+        return Promise.resolve({ data: page, error: null }).then(onfulfilled, onrejected);
       },
     };
     return builder;
@@ -96,6 +104,14 @@ function createFakeSupabaseClient(): SupabaseClient<Database> {
 
   return {
     from: (table: string) => makeBuilder(table),
+    async rpc(fn: string, args: Record<string, unknown>) {
+      if (fn === "set_submission_workflow_state") {
+        const row = (tables.submissions ??= []).find((r) => r.id === args.p_submission_id);
+        if (row) row.workflow_state = args.p_workflow_state;
+        return { data: null, error: null };
+      }
+      return { data: null, error: { message: `rpc ${fn} not mocked` } };
+    },
   } as unknown as SupabaseClient<Database>;
 }
 
@@ -268,7 +284,7 @@ describe("Learning persistence factory", () => {
     const activities = await teacherRepo.listActivities("biology-m4");
     const activityCycles = Object.fromEntries(activities.map((a) => [a.id, a.cycle]));
 
-    const wide = buildWideResearchDataset({
+    const wide = buildWideResearchDataset({ participantKeySecret: TEST_KEY_SECRET,
       submissions: allSubs,
       revisions: fetchedRevs,
       events: [],
@@ -293,7 +309,8 @@ describe("Learning persistence factory", () => {
     expect(wide[0].totalRubricScore).toBe(Math.round(((3 + 4 + 3 + 3) / 16) * 100));
 
     const csv = formatResearchWideDatasetCsv(wide);
-    expect(csv).toContain("M41_05");
+    expect(csv).toContain(deidentifyStudentKey("40105", TEST_KEY_SECRET));
+    expect(csv).not.toContain("M41_05");
     expect(csv.split("\n")).toHaveLength(2);
   });
 

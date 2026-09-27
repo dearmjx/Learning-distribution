@@ -11,7 +11,10 @@ interface RosterMemberEntry {
 
 export async function GET(request: Request) {
   try {
-    const identity = await resolveLearningIdentity({ requiredRole: "teacher" });
+    const identity = await resolveLearningIdentity({
+      requiredRole: "teacher",
+      classId: getPersistenceMode() === "supabase" ? new URL(request.url).searchParams.get("classId") ?? undefined : undefined,
+    });
     const repository = await getLearningRepository(identity);
     const url = new URL(request.url);
     const activityFilter = url.searchParams.get("activityId") ?? "ecosystem-food-web-01";
@@ -122,13 +125,14 @@ export async function GET(request: Request) {
 
     const students: RosterStudentProgress[] = rosterMembers.map((member) => {
       const { studentId, studentName, joinedAt } = member;
-      const studentSubs = submissions.filter(
-        (s) => s.studentId === studentId && (!activityFilter || s.activityId === activityFilter),
-      );
+      // Sort explicitly: repositories differ in order (Supabase returns newest first).
+      const studentSubs = submissions
+        .filter((s) => s.studentId === studentId && (!activityFilter || s.activityId === activityFilter))
+        .sort((a, b) => a.version - b.version);
       const latestSub = studentSubs[studentSubs.length - 1];
-      const studentEvts = allEvents.filter(
-        (e) => e.studentId === studentId && (!activityFilter || e.activityId === activityFilter),
-      );
+      const studentEvts = allEvents
+        .filter((e) => e.studentId === studentId && (!activityFilter || e.activityId === activityFilter))
+        .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
       const studentRevs = allRevisions.filter(
         (r) => r.studentId === studentId && (!activityFilter || r.activityId === activityFilter),
       );

@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import type {
   AuthorshipIndicators,
   FeedbackDecision,
@@ -79,27 +80,18 @@ export interface BuildWideDatasetOptions {
   reflections?: StudentReflectionData[];
   /** Source of truth for PAOR cycle when a submission does not carry one. */
   activityCycles?: Record<string, PaorCycle | undefined>;
+  /** Server-only secret for participant keys (RESEARCH_KEY_SECRET). */
+  participantKeySecret: string;
   authorshipBySubmission?: Record<string, AuthorshipIndicators | undefined>;
 }
 
-/** Generates de-identified participant key (e.g. M41_01, M42_05) */
-export function deidentifyStudentKey(studentId: string, classId?: string): string {
-  // If studentId has numeric format like 40105 or 40212
-  const match = studentId.match(/(\d+)/);
-  if (match) {
-    const num = match[1];
-    if (num.startsWith("401")) return `M41_${num.slice(3).padStart(2, "0") || "01"}`;
-    if (num.startsWith("402")) return `M42_${num.slice(3).padStart(2, "0") || "01"}`;
-    return `PARTICIPANT_${num.padStart(3, "0")}`;
-  }
-  // FNV-1a 32-bit: stable and collision-resistant enough for class-sized cohorts.
-  let hash = 0x811c9dc5;
-  for (const char of studentId) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  const classPrefix = classId?.includes("4-2") || classId?.includes("class-b") ? "M42" : "M41";
-  return `${classPrefix}_${hash.toString(16).padStart(8, "0")}`;
+/**
+ * Keyed, one-way participant key (LOS-015 B2): HMAC-SHA256(secret, studentId).
+ * Unlike the old scheme it never embeds or reveals the real ID, and without the
+ * server secret it cannot be brute-forced over the small student-ID space.
+ */
+export function deidentifyStudentKey(studentId: string, secret: string): string {
+  return `P_${createHmac("sha256", secret).update(studentId).digest("hex").slice(0, 12)}`;
 }
 
 export function buildWideResearchDataset(options: BuildWideDatasetOptions): ResearchParticipantRecord[] {
@@ -111,6 +103,7 @@ export function buildWideResearchDataset(options: BuildWideDatasetOptions): Rese
     reflections = [],
     authorshipBySubmission = {},
     activityCycles = {},
+    participantKeySecret,
   } = options;
 
   // Group by student + activity
@@ -163,7 +156,8 @@ export function buildWideResearchDataset(options: BuildWideDatasetOptions): Rese
       ? Number((Math.max(0, new Date(end).getTime() - new Date(start).getTime()) / 60000).toFixed(1))
       : null;
 
-    const classroomName = studentId.includes("402") || studentId.includes("4-2") ? "M.4/2" : "M.4/1";
+    // Classroom comes from stored data, never guessed from the ID string.
+    const classroomName = finalDraft?.classId ?? draft1?.classId ?? "";
     const cycle: PaorCycle | null = finalDraft?.cycle ?? draft1?.cycle ?? activityCycles[activityId] ?? null;
     const chatTokens = aiFeedbackEvents.reduce<number | null>((sum, e) => {
       const tokens = typeof e.payload.totalTokens === "number" ? e.payload.totalTokens : null;
@@ -171,7 +165,7 @@ export function buildWideResearchDataset(options: BuildWideDatasetOptions): Rese
     }, null);
 
     records.push({
-      participantKey: deidentifyStudentKey(studentId, classroomName),
+      participantKey: deidentifyStudentKey(studentId, participantKeySecret),
       classroom: classroomName,
       cycle,
       activityId,

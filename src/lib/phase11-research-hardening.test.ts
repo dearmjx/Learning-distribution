@@ -13,6 +13,8 @@ import {
 } from "@/lib/research/export";
 import type { FeedbackDecision, LearningContext, LearningEvent, Submission } from "@/lib/domain/types";
 
+const TEST_KEY_SECRET = "test-participant-key-secret";
+
 describe("Phase 11: CAR Research Architecture Hardening & Alignment", () => {
   beforeEach(() => {
     clearMemoryRepositoriesForTests();
@@ -228,8 +230,12 @@ describe("Phase 11: CAR Research Architecture Hardening & Alignment", () => {
   });
 
   it("Research Wide-Format Exporter de-identifies keys and formats CSV ready for SPSS and R", () => {
-    expect(deidentifyStudentKey("40105", "M.4/1")).toBe("M41_05");
-    expect(deidentifyStudentKey("40212", "M.4/2")).toBe("M42_12");
+    // Keyed and one-way: stable per secret, never embeds the real ID.
+    const key = deidentifyStudentKey("40105", TEST_KEY_SECRET);
+    expect(key).toMatch(/^P_[0-9a-f]{12}$/);
+    expect(key).not.toContain("40105");
+    expect(deidentifyStudentKey("40105", TEST_KEY_SECRET)).toBe(key);
+    expect(deidentifyStudentKey("40105", "a-different-secret-value")).not.toBe(key);
 
     const sub1: Submission = {
       id: "sub-1",
@@ -294,7 +300,7 @@ describe("Phase 11: CAR Research Architecture Hardening & Alignment", () => {
       },
     ];
 
-    const records = buildWideResearchDataset({
+    const records = buildWideResearchDataset({ participantKeySecret: TEST_KEY_SECRET,
       submissions: [sub1, sub2],
       events,
       teacherReviews: [
@@ -329,8 +335,10 @@ describe("Phase 11: CAR Research Architecture Hardening & Alignment", () => {
 
     expect(records).toHaveLength(1);
     const r = records[0];
-    expect(r.participantKey).toBe("M41_01");
-    expect(r.classroom).toBe("M.4/1");
+    expect(r.participantKey).toBe(deidentifyStudentKey("40101", TEST_KEY_SECRET));
+    expect(r.participantKey).not.toContain("40101");
+    // Classroom comes from stored class_id, never guessed from the student ID (LOS-015 B2).
+    expect(r.classroom).toBe("");
     expect(r.cycle).toBe(1);
     expect(r.draft1Claim).toBe("Claim draft 1");
     expect(r.finalClaim).toBe("Claim final revised");
@@ -344,8 +352,8 @@ describe("Phase 11: CAR Research Architecture Hardening & Alignment", () => {
 
     const csv = formatResearchWideDatasetCsv(records);
     expect(csv).toContain("ParticipantKey,Classroom,Cycle,ActivityID");
-    expect(csv).toContain('"M41_01"');
-    expect(csv).toContain('"M.4/1"');
+    expect(csv).toContain(`"${deidentifyStudentKey("40101", TEST_KEY_SECRET)}"`);
+    expect(csv).not.toContain("40101");
     expect(csv).toContain('"Claim draft 1"');
     expect(csv).toContain('"Claim final revised"');
   });

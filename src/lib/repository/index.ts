@@ -88,6 +88,10 @@ class MemoryScopedLearningRepository implements ScopedLearningRepository {
   async listPeerReviews(submissionId?: string, reviewerStudentId?: string): Promise<PeerReview[]> {
     return memory.listPeerReviews(submissionId, this.identity.context.role === "student" ? this.studentId(reviewerStudentId) : reviewerStudentId);
   }
+  async listConsentedStudentIds(_purpose: string): Promise<string[] | null> {
+    // Memory mode holds synthetic demo data only; consent is enforced in Supabase mode.
+    return null;
+  }
   async listReceivedPeerReviews(activityId: string): Promise<PeerReview[]> {
     const authorId = this.studentId();
     return memory

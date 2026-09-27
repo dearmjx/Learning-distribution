@@ -94,6 +94,11 @@ export interface ScopedLearningRepository {
   listInteractions(studentId: string, activityId?: string): Promise<AiInteraction[]>;
   addPeerReview(input: Omit<PeerReview, "id" | "createdAt">): Promise<PeerReview>;
   listPeerReviews(submissionId?: string, reviewerStudentId?: string): Promise<PeerReview[]>;
+  /**
+   * External IDs of students in the scoped class with current granted consent for `purpose`.
+   * Returns null when consent is not tracked (memory/demo mode with synthetic data only).
+   */
+  listConsentedStudentIds(purpose: string): Promise<string[] | null>;
   /** Reviews written about the scoped student's own work, with the reviewer anonymized. */
   listReceivedPeerReviews(activityId: string): Promise<PeerReview[]>;
   getAssignedPeerReviewDraft(studentId: string, activityId: string): Promise<PeerReviewSubmission | undefined>;

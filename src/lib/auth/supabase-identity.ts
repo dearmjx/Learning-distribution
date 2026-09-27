@@ -28,6 +28,8 @@ type RequiredRole = Extract<LearningRole, "student" | "teacher" | "researcher">;
 interface ResolveOptions {
   activityId?: string;
   requiredRole?: RequiredRole;
+  /** Requested class (e.g. a teacher of M.4/1 and M.4/2). Honoured only if the user is an active member. */
+  classId?: string;
 }
 
 function localIdentity(options: ResolveOptions): ResolvedLearningIdentity {
@@ -74,7 +76,7 @@ export async function resolveLearningIdentity(options: ResolveOptions = {}): Pro
 
   const { data: memberships, error: membershipError } = await client
     .from("memberships")
-    .select("class_id, role, status")
+    .select("class_id, role, status, starts_at, ends_at")
     .eq("profile_id", profile.id)
     .eq("status", "active");
   if (membershipError || !memberships?.length) {
@@ -82,7 +84,16 @@ export async function resolveLearningIdentity(options: ResolveOptions = {}): Pro
   }
 
   const requiredRole = options.requiredRole;
-  const membership = memberships.find((item) => !requiredRole || item.role === requiredRole);
+  const now = Date.now();
+  // Same validity window as RLS, and a deterministic choice when a teacher has several classes.
+  const eligible = memberships
+    .filter((item) => !requiredRole || item.role === requiredRole)
+    .filter((item) => (!item.starts_at || Date.parse(item.starts_at) <= now) && (!item.ends_at || Date.parse(item.ends_at) > now))
+    .sort((a, b) => a.class_id.localeCompare(b.class_id));
+  if (options.classId && !eligible.some((item) => item.class_id === options.classId)) {
+    throw new LearningAuthError("Requested class is not one of your active classes", 403);
+  }
+  const membership = options.classId ? eligible.find((item) => item.class_id === options.classId) : eligible[0];
   if (!membership) {
     throw new LearningAuthError("Authenticated user is not authorized for this Learning OS operation", 403);
   }

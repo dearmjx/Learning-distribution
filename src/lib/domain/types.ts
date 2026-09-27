@@ -224,6 +224,8 @@ export interface Submission {
   draft1Frozen?: boolean;
   draft1FrozenAt?: string;
   feedbackDecisions?: FeedbackDecision[];
+  /** Class the submission was made in (set by the persistence layer). */
+  classId?: string;
 }
 
 export interface Revision {

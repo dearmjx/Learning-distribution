@@ -581,3 +581,14 @@ Live service probes run in this session (secret values never printed):
 - Local Supabase CLI check (`Get-Command supabase`) → **BLOCKED** (`supabase` CLI is not installed on PATH and `supabase/config.toml` is absent, so `supabase test db` cannot be executed locally).
 
 `LEARNING_PERSISTENCE=memory` remains the default until live Ollama and a reachable Supabase instance (with migrations `001`–`010` applied) are available.
+
+## P0 fixes LOS-014 + LOS-015 — 2026-09-27
+
+Status: both P0 tickets are done on `feat/phase11-research-hardening` (not pushed). See the ticket files for details.
+- LOS-014 (`5fb5d11`): no fabricated student content. Phase 2/5/6/7 inputs start empty and are required. Real anonymized received peer reviews are shown (migration 012 RPC). Reflections are stored as given (migration 011). Failed fetches are guarded.
+- LOS-015: pagination past 1000 rows, immutable submissions and whitelisted events, consent-filtered export, HMAC participant keys, class-scoped teacher queries, explicit roster sort (migration 013).
+- Verification: typecheck 0 · `npm test` 70/70 · build OK.
+- New env vars: `RESEARCH_KEY_SECRET` (required in Supabase mode), `RESEARCH_CONSENT_PURPOSE`.
+- The user migrates Supabase themselves: apply 001–013 in order, enable pgtap, run `supabase/tests/phase9_isolation.sql` (plan 18).
+- Vercel: no deployment is connected to `dearmjx/Learning-distribution`, and this branch is unpushed. Don't deploy memory mode or localhost Ollama to Vercel.
+- Next: LOS-016 (workflow, including the C1 demo-mode 403 at Phase 4), then LOS-017, LOS-019, and LOS-009.

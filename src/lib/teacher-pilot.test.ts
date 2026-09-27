@@ -256,6 +256,9 @@ describe("Phase 10 Teacher Pilot Operations", () => {
           order() {
             return builder;
           },
+          range() {
+            return builder;
+          },
           async maybeSingle() {
             const matched = (tables[table] ?? []).filter((r) => filters.every((f) => f(r)));
             return { data: matched[0] ?? null, error: null };
@@ -274,9 +277,13 @@ describe("Phase 10 Teacher Pilot Operations", () => {
 
     vi.spyOn(supabaseServer, "getSupabaseServerClient").mockResolvedValue(fakeClient);
 
-    const res = await getTeacherRoster(
+    // A class the teacher does not belong to is refused, never silently swapped (LOS-015 C8).
+    const foreign = await getTeacherRoster(
       new Request("http://localhost/api/teacher/roster?activityId=custom-activity-id&classId=biology-m4-class-b"),
     );
+    expect(foreign.status).toBe(403);
+
+    const res = await getTeacherRoster(new Request("http://localhost/api/teacher/roster?activityId=custom-activity-id"));
     expect(res.status).toBe(200);
     const data = (await res.json()) as {
       classId: string;
