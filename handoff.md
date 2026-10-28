@@ -1,5 +1,63 @@
 # Learning OS Handoff
 
+## Session handoff — 2026-10-28 (READ FIRST)
+
+Frontend audit, AI coach moved to Qwen 3.5 4B on LM Studio, iPhone/iPad UI, teacher password gate, Vercel hosting plan. Full picture with diagrams: `docs/architecture-map.html` (published as the "Learning OS Architecture Map" artifact, https://claude.ai/artifact/KsNwYvUCF6R19XdQ6Gookd).
+
+### Git state
+
+- Branch `codex/learning-os-improvements`. Commits from this session: `b276b89` (main fix set, also carries the branch's earlier pending work), `b725498` (chat recovery), plus the handoff/map commit after it.
+- **Not pushed.** The push was blocked by the session's auto-mode permission check. No PR exists yet. Run `git push -u origin codex/learning-os-improvements`, then open a PR into `main` (repo `dearmjx/Learning-distribution`).
+- Checks at last commit: `npx tsc --noEmit` clean; `npx vitest run` 19 files / 74 tests passed.
+
+### What changed and why
+
+- **Blocker fixed:** in memory/demo mode Freeze Draft 1, peer review, revision and reflection all returned 403, because the page sent a studentId from a client-side picker that never matched the server session. The client no longer sends studentId and the picker is gone.
+- **AI:** `LocalProvider` has a 90 s timeout, sends `reasoning_effort: "none"` (qwen3.5 otherwise returns empty content), uses `json_schema` (LM Studio rejects `json_object`), and never shows `reasoning_content`. Prompts require replies to end with `?`.
+- **Data:** Phase 2 autosaves while typing; real `responseTimeSeconds` per phase; memory and event stores on `globalThis` (survive `next dev` recompiles, but NOT a server restart).
+- **Chat recovery:** on 409 `draft1_required` (demo data wiped by a restart), Phase 4 reopens the Draft 1 form with the text kept; unanswered chat messages get a resend button; Freeze rejects starter-only drafts.
+- **iPhone/iPad:** 16 px inputs on touch devices, 44 px targets, swipeable stepper, safe areas, `viewport-fit=cover`. Gate pages (`/demo`, `/teacher/unlock`) are now styled.
+- **Teacher gate:** `/teacher/*`, `/api/teacher/*`, `/api/research/*` need `TEACHER_DASHBOARD_PASSWORD` (signed 8 h cookie, 10 tries/min). Lock button on teacher pages.
+- Student telemetry console only with `?debug=1`. `.claude/launch.json` starts Next with `node node_modules/next/dist/bin/next dev -p 3100` (`npx` hung on Windows).
+
+### Local runtime (this machine: RTX 4050 Laptop, 6 GB VRAM)
+
+- `.env.local` (gitignored): `LOCAL_LLM_BASE_URL=http://localhost:1234/v1`, `LOCAL_LLM_MODEL=qwen3.5-4b`, `TEACHER_DASHBOARD_PASSWORD=3.14` (demo only), `TEACHER_SESSION_SECRET` (random).
+- Before class / after a reboot: `lms server start`, then `lms load qwen3.5-4b --identifier qwen3.5-4b -y` (`lms` is at `%USERPROFILE%\.lmstudio\bin\lms.exe`). `/api/ready` should report `local LLM reachable (qwen3.5-4b)`.
+- Do not keep Ollama models loaded at the same time: two runtimes do not fit in 6 GB. Ollama 0.33.3 logs "model architecture does not currently support parallel requests" for qwen35, so it answers one request at a time.
+- Load test (one burst): LM Studio 30 concurrent = 30/30 OK, p50 16.4 s, max 29.3 s, ~90 tok/s; through the app coach code 30/30, max 34.1 s. Ollama 20 concurrent: max 53 s.
+- `src/lib/ollama.test.ts` is a live test against LM Studio (`LOCAL_LLM_BASE_URL` / `LOCAL_LLM_MODEL` override). It no longer loads `ornith:9b`.
+
+### Decisions made with the user
+
+- Hosting: Vercel (region sin1) + Supabase (Singapore). AI is hybrid: classroom GPU through Cloudflare Tunnel + Access service token first, cloud model only for students with consent, fallback question last.
+- Sign-in: teacher-made class codes (student ID + 6-character code printed on cards, no email).
+- First hosted pilot: 27 students. Budget: school pays, plan not chosen yet (free ≈ domain only; recommended ≈ $45/month for Vercel Pro + Supabase Pro).
+- LINE OA reports (teacher daily, parent weekly with consent, student nudges) are planned, not built.
+
+### What the user needs to do
+
+1. Push the branch and open the PR.
+2. Rotate the Supabase service-role key: it was printed in this session's tool output by mistake (it did not leave this machine).
+3. Get the school's decision on the hosting plan, then create Vercel, Supabase (Singapore) and Cloudflare accounts and a domain. Enter secrets in Vercel yourself.
+4. Choose the cloud LLM provider for the fallback.
+5. Decide which PC runs LM Studio during class.
+6. Provide the 27 student IDs (no names) and approve the new consent line about the cloud fallback.
+7. Update system Node to 24.22.1 (needs an admin account; `engines` requires it).
+
+### Next work for Claude (in order)
+
+1. DT-4: Phases 5–7 must reload their "already submitted" state after refresh (students can currently resubmit).
+2. Vercel prep H1–H9 from the map: class-code login + card printing (H1, no login page exists yet), LLM router with tunnel headers and consent check (H2/H3), rate limit in Supabase (H4), `maxDuration = 60` + `vercel.json` region (H5), provider provenance in research export (H6).
+3. Playwright E2E for the edge cases in the map (DT-1, DT-2, DT-8, IN-1, DV-1), full coach evaluation (AI-5, AI-7 judgmental praise), 50-minute soak test (AI-10).
+4. Known open items: Draft 1 unlock-then-refreeze check in memory mode (DT-6); Phase 5 helper text and Phase 7 checklist are hardcoded to the ecosystem unit; teacher dashboard only checked for layout and the gate; default hint depth "deep" (−3 pt) needs the teacher's confirmation.
+
+### Gotchas
+
+- Memory/demo mode loses everything on a dev-server restart. An open page then shows stale "frozen" state; the chat now recovers, but other phases do not.
+- The in-memory rate limiter does not work across Vercel instances (H4).
+- Thai text: the coach guardrail replaces replies that are not questions, so prompt changes must keep the "end with ?" rule.
+
 ## Security verification — 2026-10-23
 
 - Reviewed Node.js CVE-2026-111497 against the Node.js advisory and recorded repository security-boundary findings in `audit/SECURITY_AUDIT_2026-10-23.md`.

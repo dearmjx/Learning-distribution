@@ -149,7 +149,8 @@ html { scroll-behavior: smooth; }
       <span class="chip ok">Flow นักเรียน Phase 1→4 + chat ผ่านในเบราว์เซอร์</span>
       <span class="chip ok">Qwen 3.5 4B บน LM Studio · 30 คนพร้อมกัน 30/30</span>
       <span class="chip warn">Phase 5–7 ยังไม่ทดสอบจนจบ</span>
-      <span class="chip neutral">branch codex/learning-os-improvements · ยังไม่ commit</span>
+      <span class="chip info">แผน Vercel: hybrid AI · login รหัสห้อง · 27 คน</span>
+      <span class="chip neutral">branch codex/learning-os-improvements · commit แล้ว ยังไม่ push</span>
     </div>
   </header>
 
@@ -166,6 +167,7 @@ html { scroll-behavior: smooth; }
     <a href="#brainstorm">Brainstorm</a>
     <a href="#future">Soon-to-be</a>
     <a href="#line">LINE OA</a>
+    <a href="#hosting">Vercel hosting</a>
     <a href="#edge-cases">Edge-case tests</a>
     <a href="#roadmap">Roadmap</a>
   </nav>
@@ -745,6 +747,166 @@ sequenceDiagram
     </div>
   </section>
 
+  <section id="hosting">
+    <div class="sec-head">
+      <span class="eyebrow">Hosting plan · Vercel + Supabase + GPU ของโรงเรียน</span>
+      <h2>แผนขึ้น Vercel พร้อม backend</h2>
+      <p>สิ่งที่ตัดสินใจแล้ว: AI แบบ hybrid (GPU ของเราก่อน ถ้าไม่ได้ใช้ cloud), นักเรียนเข้าด้วยรหัสที่ครูสร้าง, pilot 27 คน, โรงเรียนเป็นผู้จ่ายค่าบริการ</p>
+    </div>
+    <div class="meta-row">
+      <span class="chip info">AI: GPU → cloud → คำถามสำรอง</span>
+      <span class="chip info">Login: รหัสนักเรียน + รหัสบนการ์ด</span>
+      <span class="chip info">27 นักเรียน · 1 ครู</span>
+      <span class="chip warn">ค่าใช้จ่าย: รอโรงเรียนเลือก</span>
+    </div>
+
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  subgraph Class["ห้องเรียน"]
+    IPAD["iPad / iPhone นักเรียน\nเบราว์เซอร์"]
+    TPAD["iPad ครู"]
+    PC["PC/โน้ตบุ๊กครู RTX 4050\nLM Studio · qwen3.5-4b\ncloudflared"]
+  end
+  subgraph Vercel["Vercel · region sin1 (สิงคโปร์)"]
+    WEB["Next.js หน้าเว็บ"]
+    FN["Functions /api/*\nmaxDuration 60s"]
+    ROUTER["LLM router\n1 GPU ผ่าน tunnel\n2 cloud (เฉพาะคนที่ให้ consent)\n3 คำถามสำรอง"]
+  end
+  subgraph Supa["Supabase · ap-southeast-1"]
+    AUTH["Auth\nบัญชีจากรหัสห้อง"]
+    PG[("Postgres + RLS\n21 tables + rate_limits")]
+  end
+  CF["Cloudflare Tunnel + Access\nservice token"]
+  CLOUD["Cloud LLM API\nOpenAI-compatible"]
+  IPAD -->|https| WEB
+  TPAD -->|https| WEB
+  WEB --> FN
+  FN --> AUTH
+  FN --> PG
+  FN --> ROUTER
+  ROUTER -->|CF-Access headers| CF -->|outbound tunnel| PC
+  ROUTER -.->|GPU ปิด/ช้า/คิวเต็ม| CLOUD
+</pre>
+    </div>
+    <p class="cap">PC ในห้องเรียนเปิด tunnel ออกไปหา Cloudflare เอง จึงไม่ต้องเปิดพอร์ตหรือขอ IP จากโรงเรียน LM Studio ไม่มีระบบรหัสผ่าน จึงต้องให้ Cloudflare Access ตรวจ service token ก่อนทุกคำขอ</p>
+
+    <h3>สิ่งที่ต้องแก้ในโค้ดก่อนขึ้น Vercel</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>งาน</th><th>ทำไม</th><th>ขนาด</th></tr></thead>
+        <tbody>
+          <tr><td class="num">H1</td><td><b>หน้า login ด้วยรหัสห้อง</b> · ครูสร้างบัญชี 27 คนจาก roster → ระบบสร้างผู้ใช้ Supabase ด้วยอีเมลภายใน (<code>40101@m4-1.learnos.invalid</code>) และรหัส 6 ตัวอักษรที่สุ่มให้ · พิมพ์การ์ดแจก · ครูรีเซ็ตรหัสได้ · ล็อกชั่วคราวเมื่อเดาผิดหลายครั้ง</td><td>ตอนนี้ยังไม่มีหน้า login เลย มีแค่ callback · นักเรียนไม่ต้องมีอีเมล ใช้ iPad ร่วมกันได้</td><td><span class="chip warn">ใหญ่</span></td></tr>
+          <tr><td class="num">H2</td><td><b>LLM router</b>: GPU ผ่าน tunnel ก่อน (ตรวจ health ทุก 30 วิ, timeout เชื่อมต่อ 3 วิ, รวม 45 วิ) → cloud ถ้ามี consent → คำถามสำรอง</td><td>Vercel เรียก <code>localhost:1234</code> ไม่ได้ · ต้องไม่ส่งข้อความเด็กที่ไม่ให้ consent ออก cloud</td><td><span class="chip warn">กลาง</span></td></tr>
+          <tr><td class="num">H3</td><td><code>LocalProvider</code> รับ header เพิ่ม (<code>CF-Access-Client-Id</code>, <code>CF-Access-Client-Secret</code>) และ provider cloud แบบ OpenAI-compatible</td><td>ผ่าน Cloudflare Access ได้ · ใช้ class เดิมกับ cloud ได้</td><td><span class="chip ok">เล็ก</span></td></tr>
+          <tr><td class="num">H4</td><td>ย้าย rate limit จากหน่วยความจำไป Supabase (ตาราง <code>rate_limits</code> หรือฟังก์ชัน SQL)</td><td>Vercel รันหลาย instance พร้อมกัน ตัวนับในหน่วยความจำจะไม่ตรงกัน</td><td><span class="chip ok">เล็ก</span></td></tr>
+          <tr><td class="num">H5</td><td><code>export const maxDuration = 60</code> ใน <code>/api/sessions</code>, <code>/api/coach/chat</code> · <code>vercel.json</code> กำหนด region <code>sin1</code></td><td>30 คนพร้อมกันคนสุดท้ายรอ ~34 วิ · อยู่ใกล้ Supabase สิงคโปร์</td><td><span class="chip ok">เล็ก</span></td></tr>
+          <tr><td class="num">H6</td><td>บันทึกว่าแต่ละคำตอบมาจาก GPU / cloud / สำรอง ลง <code>learning_events</code> และแสดงใน export วิจัย</td><td>ผลวิจัยต้องแยกได้ว่าคำตอบมาจากโมเดลไหน</td><td><span class="chip ok">เล็ก</span></td></tr>
+          <tr><td class="num">H7</td><td>ใช้ <code>LEARNING_PERSISTENCE=supabase</code> เท่านั้น · รัน migrations 001–013 บนโปรเจกต์จริง · ทดสอบ RLS</td><td>memory mode ใช้บน Vercel ไม่ได้ (ข้อมูลไม่แชร์ระหว่าง instance และหายเมื่อ instance ปิด)</td><td><span class="chip ok">เล็ก</span></td></tr>
+          <tr><td class="num">H8</td><td>teacher gate ใช้รหัสยาวจริง (ไม่ใช่ 3.14) และครูมีบัญชี Supabase role teacher</td><td>เว็บเปิดสู่อินเทอร์เน็ตแล้ว</td><td><span class="chip ok">เล็ก</span></td></tr>
+          <tr><td class="num">H9</td><td>แบบ consent เพิ่มข้อความว่า “ถ้าเครื่องในห้องใช้ไม่ได้ ข้อความคำตอบอาจถูกส่งไปผู้ให้บริการ AI ภายนอก” + ช่องติ๊กแยก</td><td>PDPA ผู้เยาว์ · router ใช้ช่องนี้ตัดสินใจ</td><td><span class="chip neutral">เอกสาร</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Environment variables บน Vercel</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ตัวแปร</th><th>ค่า</th><th>ความลับ</th></tr></thead>
+        <tbody>
+          <tr><td><code>LEARNING_PERSISTENCE</code></td><td><code>supabase</code></td><td>ไม่</td></tr>
+          <tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code></td><td>จาก Supabase project</td><td>ไม่ (public)</td></tr>
+          <tr><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td>ใช้สร้างบัญชีนักเรียน (H1) เท่านั้น</td><td><span class="chip crit">ลับมาก</span></td></tr>
+          <tr><td><code>LOCAL_LLM_BASE_URL</code>, <code>LOCAL_LLM_MODEL</code></td><td><code>https://llm.&lt;โดเมนโรงเรียน&gt;/v1</code>, <code>qwen3.5-4b</code></td><td>ไม่</td></tr>
+          <tr><td><code>LOCAL_LLM_ACCESS_CLIENT_ID</code>, <code>LOCAL_LLM_ACCESS_CLIENT_SECRET</code></td><td>Cloudflare Access service token</td><td><span class="chip crit">ลับ</span></td></tr>
+          <tr><td><code>CLOUD_LLM_BASE_URL</code>, <code>CLOUD_LLM_MODEL</code>, <code>CLOUD_LLM_API_KEY</code></td><td>ผู้ให้บริการ cloud ที่เลือก</td><td><span class="chip crit">ลับ</span></td></tr>
+          <tr><td><code>TEACHER_DASHBOARD_PASSWORD</code>, <code>TEACHER_SESSION_SECRET</code></td><td>รหัสยาว + สุ่ม 32 ตัว</td><td><span class="chip crit">ลับ</span></td></tr>
+          <tr><td><code>RESEARCH_KEY_SECRET</code>, <code>RESEARCH_CONSENT_PURPOSE</code></td><td>คงที่ตลอดการวิจัย</td><td><span class="chip crit">ลับ</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>ค่าใช้จ่าย (ให้โรงเรียนเลือก)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>รายการ</th><th>ทางเลือกฟรี</th><th>ทางเลือกแนะนำ</th><th>หมายเหตุ</th></tr></thead>
+        <tbody>
+          <tr><td>Vercel</td><td>Hobby $0 · บัญชีส่วนตัว · ใช้เชิงพาณิชย์ไม่ได้ · function สูงสุด 300 วิ</td><td>Pro $20/เดือน · ให้หลายคนดูแลร่วมกันได้</td><td>งานวิจัยในโรงเรียนอาจเข้าข่าย non-commercial ให้โรงเรียนตรวจเงื่อนไข</td></tr>
+          <tr><td>Supabase</td><td>Free $0 · <b>หยุดเองถ้าไม่มีการใช้ฐานข้อมูล 7 วัน</b> · ไม่มี backup รายวัน</td><td>Pro ~$25/เดือน · ไม่หยุด · backup รายวัน 7 วัน</td><td>ข้อมูลวิจัยต้องมี backup และช่วงปิดเทอมจะเกิน 7 วัน จึงแนะนำ Pro</td></tr>
+          <tr><td>Cloudflare Tunnel + Access</td><td>$0 (ตรวจขีดจำกัด Zero Trust ปัจจุบัน)</td><td>$0</td><td>ต้องมีโดเมนที่อยู่บน Cloudflare</td></tr>
+          <tr><td>โดเมน</td><td>ใช้ <code>*.vercel.app</code> สำหรับเว็บได้</td><td>~$10/ปี</td><td>tunnel ต้องใช้โดเมนของเราเอง</td></tr>
+          <tr><td>Cloud LLM สำรอง</td><td>–</td><td>จ่ายตามใช้</td><td>27 คน × ~15 คำขอ × ~800 token ≈ 0.3 ล้าน token ต่อคาบ <i>เฉพาะเมื่อ GPU ใช้ไม่ได้</i> ปกติแทบไม่เสีย ตรวจราคาผู้ให้บริการก่อน</td></tr>
+          <tr><td><b>รวม</b></td><td>~$10/ปี (โดเมน)</td><td>~$45/เดือน + โดเมน + LLM ตามใช้</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="phase-row">
+      <div class="phase">
+        <span class="when">สัปดาห์ 1 · บัญชี</span>
+        <h3>เตรียมระบบ</h3>
+        <ol>
+          <li>โรงเรียนเลือกแพ็กเกจ, สร้างบัญชี Vercel / Supabase (region สิงคโปร์) / Cloudflare</li>
+          <li>ซื้อโดเมน ย้าย DNS ไป Cloudflare</li>
+          <li>ติดตั้ง <code>cloudflared</code> บน PC ที่มี GPU สร้าง tunnel <code>llm.&lt;โดเมน&gt;</code> → <code>localhost:1234</code> + Access policy แบบ service token</li>
+          <li>เลือกผู้ให้บริการ cloud LLM และสร้าง API key</li>
+        </ol>
+      </div>
+      <div class="phase">
+        <span class="when">สัปดาห์ 2 · โค้ด</span>
+        <h3>H1–H8</h3>
+        <ol>
+          <li>หน้า login + หน้าครูสร้างบัญชี/พิมพ์การ์ด</li>
+          <li>LLM router + header tunnel + cloud provider + consent check</li>
+          <li>rate limit บน Supabase, maxDuration, region</li>
+          <li>Preview deploy บน Vercel ต่อ Supabase โปรเจกต์ staging</li>
+        </ol>
+      </div>
+      <div class="phase">
+        <span class="when">สัปดาห์ 3 · ซ้อม</span>
+        <h3>ซ้อมเหมือนวันจริง</h3>
+        <ol>
+          <li>สร้างบัญชีทดสอบ 27 บัญชี ยิง 30 คำขอพร้อมกันผ่าน tunnel</li>
+          <li>ปิด LM Studio กลางคาบ ดูว่า fallback ทำงาน</li>
+          <li>ทดสอบบน iPad จริงผ่าน Wi-Fi โรงเรียน (บาง Wi-Fi บล็อก <code>*.vercel.app</code>)</li>
+          <li>ไล่ edge-case ที่ยังเหลือ (ด้านล่าง)</li>
+        </ol>
+      </div>
+      <div class="phase">
+        <span class="when">วัน pilot</span>
+        <h3>เช็กลิสต์ก่อนคาบ</h3>
+        <ol>
+          <li>เปิด PC, LM Studio โหลด <code>qwen3.5-4b</code>, ปิด Ollama</li>
+          <li><code>cloudflared</code> เชื่อมต่ออยู่</li>
+          <li><code>/api/ready</code> เป็นสีเขียวทั้ง GPU และ Supabase</li>
+          <li>มีการ์ดรหัสสำรอง และครูรีเซ็ตรหัสได้</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h3>ความเสี่ยง</h3>
+        <ul>
+          <li>PC ปิด/หลับระหว่างคาบ → cloud รับแทน (ถ้ามี consent) ไม่งั้นได้คำถามสำรอง</li>
+          <li>tunnel เพิ่ม latency ~50–150 ms ต่อคำขอ เทียบกับเวลาคิด 1–30 วิ ถือว่าน้อย</li>
+          <li>Wi-Fi โรงเรียนบล็อกโดเมนใหม่ → ขอ IT whitelist ล่วงหน้า</li>
+          <li>service role key หลุด = เข้าถึงข้อมูลทั้งหมด → เก็บใน Vercel env เท่านั้น, ใช้เฉพาะ route สร้างบัญชี</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>สิ่งที่ต้องได้จากคุณ</h3>
+        <ul>
+          <li>แพ็กเกจที่โรงเรียนอนุมัติ (ฟรี หรือ ~$45/เดือน)</li>
+          <li>บัญชี Vercel, Supabase, Cloudflare และโดเมน (คุณใส่ key เองใน Vercel ผมไม่ต้องเห็น)</li>
+          <li>ผู้ให้บริการ cloud LLM ที่จะใช้</li>
+          <li>PC เครื่องไหนเปิด LM Studio ระหว่างคาบ</li>
+          <li>รายการรหัสนักเรียน 27 คน (ไม่ต้องมีชื่อ) และอนุมัติข้อความ consent ใหม่</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <section id="edge-cases">
     <div class="sec-head">
       <span class="eyebrow">Edge-case test plan</span>
@@ -885,6 +1047,7 @@ sequenceDiagram
           <li>แสดงลำดับคิว AI ให้นักเรียนเห็น (30 คนพร้อมกัน คนสุดท้ายรอ ~30 วินาที)</li>
           <li>รัน coach evaluation กับ Qwen 3.5 4B</li>
           <li>Playwright E2E บน iPhone/iPad viewport (LOS-019)</li>
+          <li>ขึ้น Vercel: H1–H9 ในส่วน <a href="#hosting">Vercel hosting</a> (login รหัสห้อง, LLM router + tunnel, rate limit บน Supabase)</li>
         </ol>
       </div>
       <div class="phase">
