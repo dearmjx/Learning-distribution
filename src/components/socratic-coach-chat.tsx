@@ -12,6 +12,8 @@ export interface MessageItem {
   mode?: "coach" | "opponent";
   createdAt: string;
   telemetryPill?: string;
+  /** A student message the coach never answered; shown with a retry button. */
+  failed?: boolean;
 }
 
 interface SocraticCoachChatProps {
@@ -20,6 +22,8 @@ interface SocraticCoachChatProps {
   studentId?: string;
   studentCer?: CerResponse;
   initialCoachFeedback?: string;
+  /** Called when the server has no Draft 1 for this activity (e.g. demo data was reset). */
+  onDraftMissing?: () => void;
 }
 
 const QUICK_PROMPTS = [
@@ -35,6 +39,7 @@ export function SocraticCoachChat({
   studentId = "demo-student-01",
   studentCer,
   initialCoachFeedback,
+  onDraftMissing,
 }: SocraticCoachChatProps) {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [input, setInput] = useState("");
@@ -90,7 +95,7 @@ export function SocraticCoachChat({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  async function sendMessage(textToSend?: string) {
+  async function sendMessage(textToSend?: string, retryOf?: string) {
     const text = (textToSend ?? input).trim();
     if (!text || loading) return;
 
@@ -101,7 +106,8 @@ export function SocraticCoachChat({
       createdAt: new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    // A retry replaces the failed bubble instead of stacking a duplicate question.
+    setMessages((prev) => [...prev.filter((m) => m.id !== retryOf), userMessage]);
     setInput("");
     setLoading(true);
     setError("");
@@ -123,7 +129,8 @@ export function SocraticCoachChat({
           mode,
           message: text,
           studentCer,
-          history: messages.map((m) => ({ role: m.role, content: m.content })),
+          // Unanswered questions are not part of the conversation the coach should see.
+          history: messages.filter((m) => !m.failed && m.id !== retryOf).map((m) => ({ role: m.role, content: m.content })),
         }),
       });
 
@@ -138,6 +145,7 @@ export function SocraticCoachChat({
           message: `[Socratic Chat] API error: ${errMsg}`,
           details: data,
         });
+        if (data.code === "draft1_required") onDraftMissing?.();
         throw new Error(errMsg);
       }
 
@@ -167,6 +175,7 @@ export function SocraticCoachChat({
     } catch (err) {
       const msg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI Coach";
       setError(studentFriendlyError(msg));
+      setMessages((prev) => prev.map((m) => (m.id === userMessage.id ? { ...m, failed: true } : m)));
     } finally {
       setLoading(false);
     }
@@ -218,6 +227,16 @@ export function SocraticCoachChat({
               <p className="chat-text">{item.content}</p>
               {item.telemetryPill && (
                 <div className="chat-telemetry-badge">{item.telemetryPill}</div>
+              )}
+              {item.failed && (
+                <button
+                  type="button"
+                  className="chat-retry-btn"
+                  disabled={loading}
+                  onClick={() => void sendMessage(item.content, item.id)}
+                >
+                  ⚠️ ยังไม่ได้รับคำตอบ · แตะเพื่อส่งอีกครั้ง
+                </button>
               )}
             </div>
           </div>

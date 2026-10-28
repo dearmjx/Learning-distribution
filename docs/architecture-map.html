@@ -166,6 +166,7 @@ html { scroll-behavior: smooth; }
     <a href="#brainstorm">Brainstorm</a>
     <a href="#future">Soon-to-be</a>
     <a href="#line">LINE OA</a>
+    <a href="#edge-cases">Edge-case tests</a>
     <a href="#roadmap">Roadmap</a>
   </nav>
 
@@ -504,6 +505,7 @@ erDiagram
       <div class="finding"><span class="chip warn">medium</span><span class="what">นักเรียนเห็นแผง “Backend Telemetry & Logs” และค่าปลอม (ornith:9b, Temp 0.2, localhost:11434)</span><span class="why">แก้: ซ่อนหลัง <code>?debug=1</code> และเอาชื่อโมเดลที่ hardcode ออก</span><span class="where"><code>diagnostic-terminal-drawer.tsx</code>, <code>ai-evaluating-indicator.tsx</code></span></div>
       <div class="finding"><span class="chip warn">medium</span><span class="what">iPhone ซูมหน้าเองตอนแตะช่องพิมพ์ · ปุ่มเล็กกว่า 44 px · stepper สูง 4 แถว</span><span class="why">แก้: ฟอนต์ช่องกรอก 16 px บนจอสัมผัส · ปุ่ม 44 px · stepper เลื่อนแนวนอนและจัดขั้นปัจจุบันให้อยู่กลาง · รองรับ notch</span><span class="where"><code>globals.css</code>, <code>layout.tsx</code>, <code>adi-stepper.tsx</code></span></div>
       <div class="finding"><span class="chip warn">medium</span><span class="what">หน้า /demo ไม่มี CSS เลย</span><span class="why">class <code>demo-gate-*</code> ไม่เคยถูกเขียน · แก้: เพิ่มสไตล์ ใช้ร่วมกับหน้า unlock ครู</span><span class="where"><code>globals.css</code></span></div>
+      <div class="finding"><span class="chip crit">high</span><span class="what">Chat ค้างหลังเซิร์ฟเวอร์รีสตาร์ท: ข้อความนักเรียนไม่มีคำตอบ ได้ 409 ซ้ำ ๆ</span><span class="why">หน้าเว็บยังโชว์ว่า freeze แล้ว แต่ข้อมูล demo หายไป · แก้: เปิดฟอร์ม Draft 1 ใหม่พร้อมงานเดิม, ข้อความที่ส่งไม่สำเร็จมีปุ่มส่งอีกครั้ง, ห้าม Freeze ถ้ามีแค่ข้อความจากปุ่มช่วยเริ่มประโยค</span><span class="where"><code>socratic-coach-chat.tsx</code>, <code>phase4-argumentation.tsx</code></span></div>
       <div class="finding"><span class="chip neutral">low</span><span class="what">error ภาษาอังกฤษถึงนักเรียน · stepper ไม่มี focus ring</span><span class="why">แก้: <code>studentFriendlyError</code> และ focus-visible</span><span class="where"><code>lib/ui/student-errors.ts</code></span></div>
       <div class="finding"><span class="chip neutral">tooling</span><span class="what">preview ค้างเมื่อเรียก Next ผ่าน <code>npx</code> บน Windows</span><span class="why">แก้: launch.json เรียก <code>node node_modules/next/dist/bin/next</code></span><span class="where"><code>.claude/launch.json</code></span></div>
     </div>
@@ -740,6 +742,131 @@ sequenceDiagram
     <div class="callout line">
       <span class="eyebrow">ขั้นตอนเริ่มต้นที่ถูกที่สุด</span>
       <p>สร้าง OA และ Messaging API channel → ทำ webhook ที่ตรวจลายเซ็น + ผูกบัญชีครู 1 คน → ส่งสรุปรายวันให้ครูคนเดียว 1 สัปดาห์ → ถ้าครูใช้จริง ค่อยเปิดฝั่งผู้ปกครองพร้อม consent</p>
+    </div>
+  </section>
+
+  <section id="edge-cases">
+    <div class="sec-head">
+      <span class="eyebrow">Edge-case test plan</span>
+      <h2>แผนทดสอบกรณีขอบ</h2>
+      <p>รวมกรณีที่ทำให้ห้องเรียนจริงพังได้ จัดตามส่วนของระบบ ทุกข้อบอกวิธีทดสอบและผลที่ต้องได้ สถานะมาจากการทดสอบจริงวันนี้ <span class="chip ok">ผ่าน</span> = ทดสอบแล้ว · <span class="chip crit">บั๊ก</span> = รู้ว่าพัง · <span class="chip neutral">รอทดสอบ</span> = ยังไม่ได้ลอง · คอลัมน์ “วิธี” บอกว่าควรเป็น unit test (Vitest), E2E (Playwright, LOS-019) หรือทดสอบมือ</p>
+    </div>
+
+    <h3>1. ตัวตนและ session</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>กรณี</th><th>ผลที่ต้องได้</th><th>วิธี</th><th>สถานะ</th></tr></thead>
+        <tbody>
+          <tr><td class="num">ID-1</td><td>client ส่ง studentId ของคนอื่นไปกับ request</td><td>403 และไม่บันทึกอะไร</td><td>Vitest + curl</td><td><span class="chip ok">ผ่าน</span></td></tr>
+          <tr><td class="num">ID-2</td><td>หน้าเว็บไม่ส่ง studentId เลย (แบบใหม่)</td><td>เซิร์ฟเวอร์ใช้ตัวตนจาก session ทุก phase</td><td>E2E</td><td><span class="chip ok">ผ่าน</span> Phase 1–4 + chat</td></tr>
+          <tr><td class="num">ID-3</td><td>session Supabase หมดอายุระหว่างพิมพ์ CER</td><td>ข้อความภาษาไทยให้ login ใหม่ งานที่พิมพ์ยังอยู่</td><td>E2E (Supabase)</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">ID-4</td><td>นักเรียนสองคนใช้ iPad เครื่องเดียวสลับกัน</td><td>คนที่สองไม่เห็นงานคนแรก หลัง logout</td><td>มือ (Supabase)</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">ID-5</td><td>บัญชีไม่มี membership ในห้อง / membership หมดอายุ</td><td>403 พร้อมข้อความ “แจ้งครู”</td><td>Vitest (RLS)</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>2. ข้อมูลหาย ซ้ำ หรือไม่ตรงกัน</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>กรณี</th><th>ผลที่ต้องได้</th><th>วิธี</th><th>สถานะ</th></tr></thead>
+        <tbody>
+          <tr><td class="num">DT-1</td><td>เซิร์ฟเวอร์รีสตาร์ทขณะหน้าเว็บค้าง Phase 4 ที่ freeze แล้ว แล้วกด chat (บั๊กที่เจอวันนี้)</td><td>เปิดฟอร์ม Draft 1 ใหม่ งานยังอยู่ ข้อความไทยบอกให้ Freeze อีกครั้ง</td><td>E2E</td><td><span class="chip ok">ผ่าน</span> แก้แล้ววันนี้</td></tr>
+          <tr><td class="num">DT-2</td><td>chat ส่งไม่สำเร็จ (เน็ตหลุด, 429, 500)</td><td>ข้อความนักเรียนติดป้าย “ยังไม่ได้รับคำตอบ” และกดส่งซ้ำได้ ไม่ซ้ำในประวัติ</td><td>E2E (mock network)</td><td><span class="chip neutral">รอทดสอบ</span> โค้ดเพิ่มแล้ว</td></tr>
+          <tr><td class="num">DT-3</td><td>รีเฟรชระหว่าง Phase 2 ที่ยังไม่กดถัดไป</td><td>คำตอบที่พิมพ์ยังอยู่</td><td>E2E</td><td><span class="chip ok">ผ่าน</span></td></tr>
+          <tr><td class="num">DT-4</td><td>รีเฟรชหลังส่ง peer review / revision / reflection แล้ว</td><td>แสดงว่า “ส่งแล้ว” และส่งซ้ำไม่ได้</td><td>E2E</td><td><span class="chip crit">บั๊ก</span> ฟอร์มว่างกลับมา</td></tr>
+          <tr><td class="num">DT-5</td><td>กด Freeze สองครั้งเร็ว ๆ หรือเน็ตช้าแล้วกดซ้ำ</td><td>มี Draft 1 เดียว (idempotency key)</td><td>Vitest + E2E</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">DT-6</td><td>ปลดล็อก Draft 1 แล้ว Freeze ใหม่</td><td>Draft 1 เดิมไม่ถูกเขียนทับ ของใหม่เป็น revision</td><td>Vitest (memory + Supabase trigger)</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">DT-7</td><td>เปิดสองแท็บ พิมพ์ทั้งสองแท็บ</td><td>autosave ไม่ทับกันจนงานหาย (last-write-wins ต้องรู้ตัว)</td><td>E2E</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">DT-8</td><td>สลับกิจกรรม Cycle 1 ↔ Cycle 2 กลางทาง</td><td>สถานะ freeze/chat ไม่ข้ามกิจกรรม</td><td>E2E</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">DT-9</td><td>dev server compile route ใหม่ (HMR)</td><td>ข้อมูล demo ไม่หาย</td><td>มือ</td><td><span class="chip ok">ผ่าน</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>3. ข้อมูลที่นักเรียนกรอก</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>กรณี</th><th>ผลที่ต้องได้</th><th>วิธี</th><th>สถานะ</th></tr></thead>
+        <tbody>
+          <tr><td class="num">IN-1</td><td>Freeze ด้วยข้อความจากปุ่มช่วยเริ่มประโยคล้วน ๆ (เจอวันนี้)</td><td>ไม่ให้ Freeze บอกว่าช่องไหนต้องเติมความคิดเอง</td><td>Vitest + E2E</td><td><span class="chip neutral">รอทดสอบ</span> โค้ดเพิ่มแล้ว</td></tr>
+          <tr><td class="num">IN-2</td><td>ช่องว่าง / มีแต่ช่องว่างหรือขึ้นบรรทัด</td><td>ปุ่มถัดไปปิด และมีคำบอก</td><td>Vitest</td><td><span class="chip ok">ผ่าน</span> (Phase 2, 4)</td></tr>
+          <tr><td class="num">IN-3</td><td>วางข้อความยาวมาก (เช่น 10,000 ตัวอักษร)</td><td>400 พร้อมข้อความไทย ไม่ล่ม ไม่ส่งไป LLM</td><td>Vitest (schema)</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">IN-4</td><td>ตัวอักษรพิเศษ อีโมจิ ไทยปนอังกฤษ HTML/script</td><td>แสดงเป็นข้อความธรรมดา ไม่รันสคริปต์</td><td>E2E</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">IN-5</td><td>คัดลอกข้อความจากโจทย์มาวางทั้งหมด</td><td>authorship indicator ขึ้นให้ครูเห็น (ไม่ลงโทษอัตโนมัติ)</td><td>Vitest</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">IN-6</td><td>พิมพ์ภาษาไทยด้วยคีย์บอร์ด iOS (IME, autocorrect)</td><td>ไม่มีตัวอักษรหายหรือซ้ำตอน autosave</td><td>มือบน iPhone/iPad จริง</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>4. AI coach และ LLM</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>กรณี</th><th>ผลที่ต้องได้</th><th>วิธี</th><th>สถานะ</th></tr></thead>
+        <tbody>
+          <tr><td class="num">AI-1</td><td>LM Studio ปิด / ไม่ได้โหลดโมเดล</td><td>fallback question ภายในไม่กี่วินาที, <code>/api/ready</code> แจ้ง</td><td>มือ + Vitest</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">AI-2</td><td>โมเดลค้างเกิน 90 วินาที</td><td>timeout แล้ว fallback ไม่ค้างหน้า</td><td>Vitest (fake server)</td><td><span class="chip ok">ผ่าน</span> เคยค้าง &gt;5 นาที แก้แล้ว</td></tr>
+          <tr><td class="num">AI-3</td><td>โมเดล thinking คืน content ว่าง</td><td>ไม่แสดง reasoning_content ให้นักเรียน, fallback</td><td>Vitest</td><td><span class="chip ok">ผ่าน</span></td></tr>
+          <tr><td class="num">AI-4</td><td>โมเดลคืน JSON พัง / ไม่ใช่ JSON</td><td>parse ไม่ได้ก็ใช้คำถามสำรอง</td><td>Vitest</td><td><span class="chip ok">ผ่าน</span> (มี test เดิม)</td></tr>
+          <tr><td class="num">AI-5</td><td>นักเรียนขอให้เขียนคำตอบ / jailbreak / อ้างว่าครูอนุญาต</td><td>ไม่เฉลย ถามกลับ</td><td>coach evaluation set</td><td><span class="chip ok">ผ่าน</span> ตัวอย่าง 3 ข้อ · ชุดเต็มรอ</td></tr>
+          <tr><td class="num">AI-6</td><td>ตอบเป็นประโยคบอกเล่า ไม่ใช่คำถาม</td><td>guardrail แทนด้วยคำถามมาตรฐาน</td><td>Vitest</td><td><span class="chip ok">ผ่าน</span> เหลือ 2/15 ที่ถูกแทน</td></tr>
+          <tr><td class="num">AI-7</td><td>คำชมเชิงตัดสิน (“เยี่ยมมาก คุณเข้าใจถูกแล้ว”)</td><td>ไม่ตัดสินถูกผิด</td><td>coach evaluation</td><td><span class="chip crit">บั๊ก</span> ยังเจอใน chat</td></tr>
+          <tr><td class="num">AI-8</td><td>ส่ง chat เกิน 6 ครั้ง/นาที</td><td>429 ข้อความไทยบอกเวลารอ ปุ่มส่งซ้ำได้</td><td>Vitest + E2E</td><td><span class="chip neutral">รอทดสอบ</span> UI ใหม่</td></tr>
+          <tr><td class="num">AI-9</td><td>30 คนกดพร้อมกัน</td><td>30/30 ไม่มี timeout</td><td>load script</td><td><span class="chip ok">ผ่าน</span> สูงสุด 34 วินาที</td></tr>
+          <tr><td class="num">AI-10</td><td>ใช้ต่อเนื่องทั้งคาบ 50 นาที / GPU ร้อน</td><td>เวลาตอบไม่แย่ลงเกิน 2 เท่า ไม่มี error</td><td>soak test</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">AI-11</td><td>Ollama กับ LM Studio โหลดโมเดลพร้อมกัน (VRAM 6 GB)</td><td>ระบบเตือน หรือมีแค่ runtime เดียวทำงาน</td><td>มือ</td><td><span class="chip crit">บั๊ก</span> test เดิมโหลด ornith:9b (แก้แล้ว) ยังไม่มีคำเตือน</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>5. อุปกรณ์และเครือข่าย</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>กรณี</th><th>ผลที่ต้องได้</th><th>วิธี</th><th>สถานะ</th></tr></thead>
+        <tbody>
+          <tr><td class="num">DV-1</td><td>iPhone 375 px แนวตั้ง</td><td>ไม่มี scroll แนวนอน ช่องกรอก 16 px ปุ่ม ≥ 44 px</td><td>E2E viewport</td><td><span class="chip ok">ผ่าน</span> (จำลอง)</td></tr>
+          <tr><td class="num">DV-2</td><td>iPad แนวตั้ง/แนวนอน หน้าครู</td><td>ตารางเลื่อนในกรอบ ไม่ล้นจอ</td><td>E2E viewport</td><td><span class="chip ok">ผ่าน</span> 820 px · แนวนอนรอ</td></tr>
+          <tr><td class="num">DV-3</td><td>Safari บน iPhone/iPad จริง (notch, แป้นพิมพ์บังช่องกรอก)</td><td>ช่องที่กำลังพิมพ์ไม่ถูกแป้นบัง</td><td>มือบนเครื่องจริง</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">DV-4</td><td>Wi-Fi ห้องเรียนหลุดกลางการส่ง</td><td>ข้อความไทย งานไม่หาย ส่งซ้ำได้</td><td>E2E (offline mode)</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">DV-5</td><td>จอเล็ก + ขยายตัวอักษร (Dynamic Type 200%)</td><td>อ่านได้ ไม่ทับกัน</td><td>มือ</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">DV-6</td><td>ใช้คีย์บอร์ดอย่างเดียว / VoiceOver</td><td>ทุกปุ่มมี focus ring และชื่ออ่านได้</td><td>มือ + axe</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>6. แดชบอร์ดครูและข้อมูลวิจัย</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>กรณี</th><th>ผลที่ต้องได้</th><th>วิธี</th><th>สถานะ</th></tr></thead>
+        <tbody>
+          <tr><td class="num">TG-1</td><td>นักเรียนเปิด /teacher โดยไม่มีรหัส</td><td>ไปหน้าใส่รหัส · API ตอบ 401</td><td>Vitest + curl</td><td><span class="chip ok">ผ่าน</span></td></tr>
+          <tr><td class="num">TG-2</td><td>รหัสผิด / เดารหัสรัว ๆ</td><td>“รหัสไม่ถูกต้อง” · เกิน 10 ครั้ง/นาทีได้ 429</td><td>Vitest</td><td><span class="chip ok">ผ่าน</span> รหัสผิด · 429 รอทดสอบ</td></tr>
+          <tr><td class="num">TG-3</td><td>cookie หมดอายุ 8 ชม. / ปลอม cookie / เปลี่ยน secret</td><td>ต้องใส่รหัสใหม่</td><td>Vitest</td><td><span class="chip ok">ผ่าน</span></td></tr>
+          <tr><td class="num">TG-4</td><td>ครูกดล็อกบน iPad ที่ใช้ร่วม แล้วนักเรียนกด Back</td><td>ไม่เห็นหน้าครูจาก cache</td><td>E2E</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">TG-5</td><td>export วิจัยมีนักเรียนที่ไม่ได้ให้ consent</td><td>ไม่อยู่ในไฟล์</td><td>Vitest (มีแล้ว LOS-015)</td><td><span class="chip ok">ผ่าน</span></td></tr>
+          <tr><td class="num">TG-6</td><td>ห้องที่ยังไม่มีงานส่งเลย / ห้อง 57 คน</td><td>empty state ชัดเจน · ตารางไม่ช้า</td><td>E2E</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>7. LINE OA (เมื่อสร้าง)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>กรณี</th><th>ผลที่ต้องได้</th><th>วิธี</th><th>สถานะ</th></tr></thead>
+        <tbody>
+          <tr><td class="num">LN-1</td><td>webhook ลายเซ็นผิด / body ถูกแก้</td><td>401 ไม่ประมวลผล</td><td>Vitest</td><td><span class="chip neutral">ยังไม่สร้าง</span></td></tr>
+          <tr><td class="num">LN-2</td><td>LINE ส่ง event ซ้ำ (retry)</td><td>ประมวลผลครั้งเดียว (X-Line-Retry-Key)</td><td>Vitest</td><td><span class="chip neutral">ยังไม่สร้าง</span></td></tr>
+          <tr><td class="num">LN-3</td><td>ลิงก์ผูกบัญชีหมดอายุ / ใช้ซ้ำ / ผู้ปกครองผูกผิดเด็ก</td><td>ปฏิเสธ · ครูเห็นและยกเลิกได้</td><td>Vitest + มือ</td><td><span class="chip neutral">ยังไม่สร้าง</span></td></tr>
+          <tr><td class="num">LN-4</td><td>ผู้ปกครองถอน consent / block OA</td><td>หยุดส่งทันที outbox ไม่ retry ไม่รู้จบ</td><td>Vitest</td><td><span class="chip neutral">ยังไม่สร้าง</span></td></tr>
+          <tr><td class="num">LN-5</td><td>โควตาข้อความหมด / LINE ตอบ 429</td><td>เลื่อนส่ง แจ้งครู ไม่ทิ้งรายงาน</td><td>Vitest (fake API)</td><td><span class="chip neutral">ยังไม่สร้าง</span></td></tr>
+          <tr><td class="num">LN-6</td><td>รายงานผู้ปกครองหลุดข้อมูลเพื่อนหรือข้อความงาน</td><td>snapshot มีแต่ตัวเลขสรุปของเด็กคนนั้น</td><td>Vitest (snapshot test)</td><td><span class="chip neutral">ยังไม่สร้าง</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <span class="eyebrow">ลำดับที่แนะนำ</span>
+      <p>1) แก้ DT-4 (ส่งซ้ำ Phase 5–7) · 2) เขียน Playwright ครอบ DT-1, DT-2, DT-8, IN-1, DV-1 บน viewport iPhone/iPad · 3) รัน coach evaluation ชุดเต็มเพื่อปิด AI-5/AI-7 · 4) soak test 50 นาที (AI-10) บนเครื่องที่จะใช้จริง · 5) ทดสอบมือบน iPad/iPhone จริง (DV-3, IN-6) ก่อนวัน pilot</p>
     </div>
   </section>
 

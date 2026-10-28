@@ -14,6 +14,19 @@ const SENTENCE_STARTERS: Record<keyof CerResponse, string[]> = {
   reasoning: ["สิ่งนี้เกิดขึ้นเพราะ...", "หลักการที่อธิบายได้คือ...", "ดังนั้นจึงแสดงว่า..."],
 };
 
+/** Characters the student wrote themselves, after removing starter scaffolds and filler dots. */
+function ownWordsLength(text: string): number {
+  let rest = text;
+  for (const starter of Object.values(SENTENCE_STARTERS).flat()) {
+    for (const fragment of starter.split("...")) {
+      if (fragment.trim()) rest = rest.split(fragment.trim()).join(" ");
+    }
+  }
+  return rest.replace(/\.{2,}|…/g, " ").replace(/\s+/g, "").length;
+}
+
+const MIN_OWN_CHARS = 8;
+
 interface Phase4Props {
   activity: Activity;
   studentId?: string;
@@ -48,6 +61,13 @@ export function Phase4Argumentation({
   async function handleFreezeAndSubmit() {
     if (!cer.claim.trim() || !cer.evidence.trim() || !cer.reasoning.trim()) {
       setError("กรุณากรอก Claim, Evidence, และ Reasoning ให้ครบถ้วนเพื่อ Freeze Draft 1 Baseline ก่อนรับคำแนะนำจาก AI Coach");
+      return;
+    }
+    // A baseline made only of starter chips is not the student's own thinking (research integrity).
+    const thinFields = (["claim", "evidence", "reasoning"] as const).filter((field) => ownWordsLength(cer[field]) < MIN_OWN_CHARS);
+    if (thinFields.length > 0) {
+      const names = { claim: "Claim", evidence: "Evidence", reasoning: "Reasoning" };
+      setError(`เติมความคิดของคุณเองต่อจากตัวช่วยเริ่มประโยคใน ${thinFields.map((f) => names[f]).join(", ")} ก่อน Freeze`);
       return;
     }
 
@@ -332,6 +352,12 @@ export function Phase4Argumentation({
                   studentId={studentId}
                   studentCer={cer}
                   initialCoachFeedback={result.feedback.message}
+                  onDraftMissing={() => {
+                    // The server has no Draft 1 for this activity (demo data reset): reopen the form.
+                    setIsFrozen(false);
+                    setResult(null);
+                    setError("ระบบไม่พบ Draft 1 ของคุณ (ข้อมูลสาธิตอาจถูกรีเซ็ต) งานที่พิมพ์ยังอยู่ กด Freeze อีกครั้งเพื่อคุยกับ AI Coach ต่อ");
+                  }}
                 />
               ) : (
                 <div className="unlock-chat-banner">
