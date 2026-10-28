@@ -1,5 +1,21 @@
 # Learning OS Handoff
 
+## Security verification — 2026-10-23
+
+- Reviewed Node.js CVE-2026-111497 against the Node.js advisory and recorded repository security-boundary findings in `audit/SECURITY_AUDIT_2026-10-23.md`.
+- Changed `.nvmrc` to `24.22.1` and added `engines.node: ^24.22.1` to `package.json` and root lockfile metadata. System Node remains `24.15.0`; npm temporary runtime execution supplied Node `24.22.1` for final verification.
+- Registry-enabled baseline `npm audit --json` found 10 advisories (3 critical, 4 high, 3 moderate). Updated Next.js `15.5.28`, Vitest `5.0.5`, Vite `8.3.5`, and PostCSS override `^8.5.23` (resolved `8.5.31`). Final npm audit reports 0 vulnerabilities.
+- Static review found no confirmed P0 auth/RLS/injection defect. Live Vercel runtime, live Supabase migration state, CI and Docker are not represented in this checkout. The in-process rate limiter is not shared across serverless instances.
+- Final patched-runtime commands: `npm run typecheck` passed; `npm test` passed (18 files / 70 tests); `npm run build` passed (25 pages/routes); `npm audit --json` passed with 0 vulnerabilities. Initial sandbox build output writes failed with EPERM; retry under approved build permissions passed.
+- Outstanding external checks: connected Vercel search returned no matching `learning-os` project; the available Supabase project could not be mapped to this checkout. Live runtime/RLS are therefore unverified, and `supabase/tests/phase9_isolation.sql` was not run against a database. The in-memory rate limiter is not global across serverless instances.
+
+## Runtime/Vercel follow-up — 2026-10-24
+
+- User explicitly requested updating the machine Node install and checking Vercel config.
+- Verified official Node.js 24.22.1 x64 MSI checksum: `3bda4baf1ee709b33cf920dd633106ddb23951e322bff9c03ec9f64ab8981b01`. Windows MSI installation failed with Error 1730 because this session has no Administrator rights. System `node --version` remains `v24.15.0`; temporary MSI/log files were deleted.
+- Git remote is `https://github.com/dearmjx/Learning-distribution.git`; connected Vercel account had no project matching that repository. Did not edit unrelated Vercel projects. Existing `package.json` `engines.node: ^24.22.1` already configures Vercel to use Node 24.x; deployment runtime remains unverified until the correct project is identified and redeployed.
+- Existing worktree modifications were preserved.
+
 ## Current state
 
 - Date: 2026-08-23 (+07:00)
@@ -592,3 +608,25 @@ Status: both P0 tickets are done on `feat/phase11-research-hardening` (not pushe
 - The user migrates Supabase themselves: apply 001–013 in order, enable pgtap, run `supabase/tests/phase9_isolation.sql` (plan 18).
 - Vercel: no deployment is connected to `dearmjx/Learning-distribution`, and this branch is unpushed. Don't deploy memory mode or localhost Ollama to Vercel.
 - Next: LOS-016 (workflow, including the C1 demo-mode 403 at Phase 4), then LOS-017, LOS-019, and LOS-009.
+
+## Codex improvement sequence — 2026-10-14
+
+Branch: `codex/learning-os-improvements` (created from the existing `feat/phase11-research-hardening` working tree). Existing untracked `.claude/` and `presentation_assets/` were preserved and not edited.
+
+Implemented in sequence:
+- Production student identity now fails closed when persistence is memory. Production memory is only enabled for an explicitly allowed, password-gated synthetic demo; readiness reports memory as not production-ready.
+- Thai authorship similarity uses `Intl.Segmenter` and grapheme n-gram overlap. It remains a teacher-only review indicator.
+- Coach feedback and `ai_feedback_received` events carry prompt/content version metadata. Added synthetic RAG evaluation cases, Recall@K/MRR/scope-leak reporting, and an educator review protocol.
+- Added scoped GET/POST `/api/progress` backed by idempotent `wizard_progress_saved` events. The student workbench restores and debounces saves for phase, variable notes, and CER draft, and shows persistence status.
+- Added a validated static ecosystem content pack with explicit version metadata and reuse guidance.
+- Marked the August codebase audit as historical; added a current improvement roadmap and README links.
+
+Files changed: `.env.example`, `README.md`, `docs/CODEBASE_AUDIT_AND_CHANGE_RECOMMENDATIONS.md`, `docs/COACH_EVALUATION.md`, `docs/COURSE_CONTENT_PACKS.md`, `docs/IMPROVEMENT_ROADMAP.md`, `src/app/api/progress/route.ts`, `src/app/api/sessions/route.ts`, `src/components/student-workbench.tsx`, `src/data/course/ecosystem/activities.ts`, `src/data/course/ecosystem/content-pack.ts`, `src/data/course/ecosystem/rag-evaluation-cases.ts`, `src/data/course/knowledge-base.ts`, `src/lib/ai/coach.ts`, `src/lib/analytics/authorship.ts`, `src/lib/auth/supabase-identity.ts`, `src/lib/domain/schemas.ts`, `src/lib/domain/types.ts`, `src/lib/knowledge/evaluation.ts`, `src/lib/knowledge/hybrid-rag.ts`, `src/lib/knowledge/types.ts`, `src/lib/repository/index.ts`, `src/lib/repository/memory-repository.ts`.
+
+Verification performed:
+- `npm run typecheck` → PASSED, exit code 0.
+- `git diff --check` → PASSED; Git emitted only existing LF-to-CRLF working-copy warnings.
+- `npm run build` → PASSED after rerunning with approval for Windows workspace path access; Next.js compiled the new `/api/progress` route and all 25 pages.
+- No test suite was added or run.
+
+Open pilot gates: live Supabase CLI/database/RLS and two-student route verification, school authentication/roster decision, consent/retention/deletion/data-residency approval, and educator review of live provider outputs. In-memory progress is not durable across a server restart. Static course packs do not yet provide teacher-facing authoring or database-managed versioning.

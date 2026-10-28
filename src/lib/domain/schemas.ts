@@ -172,7 +172,7 @@ export const reflectionInputSchema = z.object({
 
 export const adiWizardStateSchema = z.object({
   currentPhase: adiPhaseSchema,
-  completedPhases: z.array(adiPhaseSchema),
+  completedPhases: z.array(adiPhaseSchema).max(7),
   investigationData: investigationDataSchema.optional(),
   draftCer: cerResponseSchema.optional(),
   activeSubmissionId: z.string().optional(),
@@ -199,6 +199,7 @@ export const learningContextSchema = z.object({
 export const activitySchema = z.object({
   id: z.string().min(1),
   courseId: z.string().min(1),
+  contentVersion: z.string().min(1).max(64).optional(),
   unit: z.string().min(1),
   chapterId: z.string().min(1).max(128).optional(),
   title: z.string().min(1),
@@ -232,6 +233,7 @@ export const coachRequestSchema = z.object({
 
 export const coachResponseSchema = z.object({
   requestId: z.string().min(1).max(128),
+  promptVersion: z.string().min(1).max(64).optional(),
   provider: z.enum(["mock", "local", "deepseek", "fallback"]),
   message: z.string().min(1).max(4_000),
   targetDimension: z.enum([
@@ -288,6 +290,7 @@ export const learningEventSchema = z.object({
     "teacher_observation_recorded",
     "reflection_completed",
     "learning_phase_changed",
+    "wizard_progress_saved",
     "authorship_indicator_created",
   ]),
   payload: z.record(z.unknown()),

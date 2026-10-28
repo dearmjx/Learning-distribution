@@ -4,6 +4,7 @@ export const ecosystemActivities: Activity[] = [
   {
     id: "ecosystem-food-web-01",
     courseId: "biology-m4",
+    contentVersion: "1.0.0",
     unit: "ระบบนิเวศ",
     chapterId: "food-web",
     title: "วิเคราะห์การเปลี่ยนแปลงในสายใยอาหาร (Cycle 1)",
@@ -27,6 +28,7 @@ export const ecosystemActivities: Activity[] = [
   {
     id: "ecosystem-energy-flow-01",
     courseId: "biology-m4",
+    contentVersion: "1.0.0",
     unit: "ระบบนิเวศ",
     chapterId: "energy-flow",
     title: "อธิบายการไหลของพลังงาน (Cycle 2)",

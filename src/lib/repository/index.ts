@@ -27,7 +27,11 @@ export function getPersistenceMode(): PersistenceMode {
 }
 
 export function getPersistenceStatus(): { mode: PersistenceMode; configured: boolean } {
-  if (getPersistenceMode() === "memory") return { mode: "memory", configured: true };
+  if (getPersistenceMode() === "memory") {
+    // In-memory mode is useful for local development and synthetic demos, but
+    // it is never a ready persistence target for production student work.
+    return { mode: "memory", configured: process.env.NODE_ENV !== "production" };
+  }
   return {
     mode: "supabase",
     configured: Boolean(

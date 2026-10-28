@@ -136,6 +136,7 @@ function citationForChunk(chunk: KnowledgeChunk): string {
   return [
     `บท: ${chunk.chapterTitle}`,
     `แหล่งที่มา: ${chunk.sourceTitle}`,
+    chunk.contentVersion ? `รุ่นเนื้อหา: ${chunk.contentVersion}` : "",
     chunk.sourceSection ? `ส่วน: ${chunk.sourceSection}` : "",
     chunk.sourcePage ? `หน้า: ${chunk.sourcePage}` : "",
   ].filter(Boolean).join(" · ");

@@ -2503,3 +2503,290 @@ body {
   min-width: 220px;
 }
 
+
+/* CER sentence starters: structure scaffolds, never content (Phase 4). */
+.starter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.starter-label {
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.starter-chips .quick-chip {
+  min-height: 36px;
+}
+
+/* =========================================================
+   iPHONE & iPAD (touch devices)
+   Students use school iPads and their own iPhones; teachers review on iPad.
+   ========================================================= */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Notch and home-indicator safe areas (viewport-fit=cover in layout.tsx). */
+.shell {
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+}
+
+/* The stepper used outline:none, which hid keyboard focus entirely. */
+.stepper-node:focus-visible,
+.quick-chip:focus-visible,
+.radio-pill-btn:focus-visible,
+.pill-link:focus-visible {
+  outline: 3px solid var(--teal);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  /* iOS Safari zooms the page when a focused field is under 16px. */
+  input,
+  textarea,
+  select,
+  .form-input,
+  .form-textarea,
+  .form-select,
+  .activity-dropdown,
+  .chat-input,
+  .teacher-comment-textarea {
+    font-size: 16px;
+  }
+
+  /* Apple HIG minimum touch target: 44pt. */
+  button,
+  .pill-link,
+  .quick-chip,
+  .filter-pill,
+  .radio-pill-btn,
+  .activity-dropdown,
+  .form-select,
+  .chat-input,
+  .primary-button,
+  .secondary-button {
+    min-height: 44px;
+  }
+
+  .radio-pill-btn {
+    min-width: 44px;
+  }
+
+  .concept-checkbox-label {
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .concept-checkbox-label input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+
+  /* Hover-only affordances stick after a tap on iOS; keep them neutral. */
+  .stepper-node:hover:not(:disabled) {
+    background: transparent;
+    border-color: transparent;
+  }
+}
+
+/* iPhone: the 7-phase stepper becomes one swipeable row instead of a 4-row grid. */
+@media (max-width: 600px) {
+  .stepper-track {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .stepper-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .stepper-node {
+    flex: 0 0 auto;
+    width: 92px;
+    scroll-snap-align: center;
+  }
+
+  .stepper-node .node-text {
+    white-space: normal;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
+  .hero h1 {
+    font-size: 1.6rem;
+    line-height: 1.25;
+  }
+
+  .hero-actions,
+  .activity-selector-box {
+    width: 100%;
+  }
+
+  .activity-selector-box {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .activity-dropdown {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .header-nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .notice-strip {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Back/next stack with the forward action on top, full width for thumbs. */
+  .action-row.space-between {
+    flex-direction: column-reverse;
+  }
+
+  .action-row.space-between > button,
+  .action-row.space-between > a {
+    width: 100%;
+  }
+
+  .radio-group-row {
+    flex-wrap: wrap;
+  }
+
+  .chat-input-row {
+    gap: 8px;
+  }
+
+  .chat-input-row .send-btn {
+    flex: 0 0 auto;
+  }
+
+  .quick-chips {
+    flex-wrap: wrap;
+  }
+
+  .demo-gate-card {
+    width: 100%;
+  }
+}
+
+/* =========================================================
+   GATE PAGES (/demo and /teacher/unlock)
+   ========================================================= */
+.demo-gate-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+.demo-gate-card {
+  width: min(100%, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 28px 24px;
+}
+
+.demo-gate-card h1 {
+  margin: 0;
+  color: var(--teal-dark);
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+
+.demo-gate-eyebrow {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--teal-light);
+}
+
+.demo-gate-copy,
+.demo-gate-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.demo-gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.demo-gate-form label {
+  font-weight: 700;
+  color: var(--teal-dark);
+}
+
+.demo-gate-form input {
+  min-height: 48px;
+  padding: 10px 14px;
+  font-size: 18px;
+  letter-spacing: 0.1em;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--ink);
+}
+
+.demo-gate-form input:focus-visible {
+  outline: 3px solid var(--teal);
+  outline-offset: 1px;
+  border-color: var(--teal);
+}
+
+.demo-gate-form .primary-button {
+  min-height: 48px;
+  width: 100%;
+}
+
+.demo-gate-card > .secondary-button {
+  align-self: flex-start;
+}
+
+.demo-gate-error,
+.demo-gate-warning {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: #fdf0ec;
+  color: #a14d3a;
+}
+
+.demo-gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.demo-gate-exit {
+  align-self: center;
+  color: var(--muted);
+}

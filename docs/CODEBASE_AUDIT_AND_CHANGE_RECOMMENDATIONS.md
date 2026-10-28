@@ -1,4 +1,6 @@
 # Learning OS Ecosystem — Technical & Architectural Audit Report
+> **Historical snapshot (August 14, 2026):** this report is not the current project status. The implementation and test inventory have changed since the audit. Use [`IMPROVEMENT_ROADMAP.md`](IMPROVEMENT_ROADMAP.md) and [`phase-x.md`](phase-x.md) for current status, and verify source before relying on any finding below.
+
 **Document ID:** `AUDIT-2026-08-14-LOS`  
 **Repository:** `c:/Users/woram/OneDrive/Desktop/Hatairat/learn os`  
 **Audited By:** Lead Technical & Architectural Audit Engineer  

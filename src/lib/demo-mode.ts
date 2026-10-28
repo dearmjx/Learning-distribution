@@ -23,7 +23,7 @@ function getSessionSecret(): string | null {
   return configuredSecret || password || null;
 }
 
-async function hmacHex(secret: string, message: string): Promise<string | null> {
+export async function hmacHex(secret: string, message: string): Promise<string | null> {
   if (!globalThis.crypto?.subtle) return null;
 
   const key = await globalThis.crypto.subtle.importKey(
@@ -42,7 +42,7 @@ async function hmacHex(secret: string, message: string): Promise<string | null> 
   return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function constantTimeEqual(left: string, right: string): boolean {
+export function constantTimeEqual(left: string, right: string): boolean {
   let difference = left.length ^ right.length;
   const length = Math.max(left.length, right.length);
 

@@ -5,6 +5,14 @@ import type { Activity, CerResponse, CoachFeedback, HintDepth, Submission } from
 import { SocraticCoachChat } from "@/components/socratic-coach-chat";
 import { AiEvaluatingIndicator } from "@/components/ai-evaluating-indicator";
 import { diagnosticLogger } from "@/lib/telemetry-logger";
+import { studentFriendlyError } from "@/lib/ui/student-errors";
+
+// Sentence starters scaffold the structure without writing the content (no answers, LOS-014).
+const SENTENCE_STARTERS: Record<keyof CerResponse, string[]> = {
+  claim: ["ฉันคิดว่า...", "เมื่อ... ลดลง จะทำให้..."],
+  evidence: ["จากข้อมูลพบว่า...", "ตัวเลขที่แสดงคือ... เพิ่มจาก... เป็น..."],
+  reasoning: ["สิ่งนี้เกิดขึ้นเพราะ...", "หลักการที่อธิบายได้คือ...", "ดังนั้นจึงแสดงว่า..."],
+};
 
 interface Phase4Props {
   activity: Activity;
@@ -26,7 +34,8 @@ export function Phase4Argumentation({
   existingResult,
 }: Phase4Props) {
   const [hintDepth, setHintDepth] = useState<HintDepth>("deep");
-  const [responseTimeSeconds, setResponseTimeSeconds] = useState(120);
+  // Research field: real seconds spent drafting before the freeze, not a constant.
+  const [phaseStartedAt] = useState(() => Date.now());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isFrozen, setIsFrozen] = useState(Boolean(existingResult?.submission?.draft1Frozen ?? existingResult?.submission));
@@ -65,12 +74,12 @@ export function Phase4Argumentation({
       const response = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // No studentId: the server records the signed-in student.
         body: JSON.stringify({
-          studentId,
           activityId: activity.id,
           content: cer,
           hintDepth,
-          responseTimeSeconds,
+          responseTimeSeconds: Math.round((Date.now() - phaseStartedAt) / 1000),
           draft1Frozen: true,
         }),
       });
@@ -109,10 +118,33 @@ export function Phase4Argumentation({
       if (hintDepth === "deep") setShowChat(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการวิเคราะห์";
-      setError(msg);
+      setError(studentFriendlyError(msg));
     } finally {
       setLoading(false);
     }
+  }
+
+  function starterChips(field: keyof CerResponse) {
+    if (isFrozen) return null;
+    return (
+      <div className="starter-chips" role="group" aria-label="ตัวช่วยเริ่มประโยค">
+        <span className="starter-label">ไม่รู้จะเริ่มยังไง? กดเลือก:</span>
+        {SENTENCE_STARTERS[field].map((starter) => (
+          <button
+            key={starter}
+            type="button"
+            className="quick-chip"
+            onClick={() => {
+              // The chip shows "..." as a cue; the student continues typing where it stops.
+              const text = starter.replace(/\.\.\.$/, "").replace(/\.\.\.\s*/g, " ");
+              onChangeCer({ ...cer, [field]: cer[field].trim() ? `${cer[field].trimEnd()} ${text}` : text });
+            }}
+          >
+            {starter}
+          </button>
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -190,6 +222,7 @@ export function Phase4Argumentation({
               onChange={(e) => onChangeCer({ ...cer, claim: e.target.value })}
               placeholder="ตัวอย่าง: หากประชากรงูลดลงอย่างมาก จะทำให้ประชากรหนูนาเพิ่มขึ้นอย่างรวดเร็ว ส่วนพืชผู้ผลิตจะลดลง และพลังงานรวมในระบบสูญเสียมากขึ้น..."
             />
+            {starterChips("claim")}
           </div>
 
           <div className="form-group">
@@ -207,6 +240,7 @@ export function Phase4Argumentation({
               onChange={(e) => onChangeCer({ ...cer, evidence: e.target.value })}
               placeholder="ตัวอย่าง: จากตารางการสืบเสาะ เมื่อประชากรงูลดลงจาก 100 เหลือ 10 ตัว พบว่าจำนวนหนูเพิ่มขึ้นจาก 50 เป็น 280 ตัวใน 3 เดือน..."
             />
+            {starterChips("evidence")}
           </div>
 
           <div className="form-group">
@@ -224,6 +258,7 @@ export function Phase4Argumentation({
               onChange={(e) => onChangeCer({ ...cer, reasoning: e.target.value })}
               placeholder="ตัวอย่าง: เพราะงูเป็นผู้บริโภคลำดับที่ 2 ที่คอยควบคุมประชากรหนู และตามกฎ 10% พลังงานจะสูญเสียเป็นความร้อนถึง 90%..."
             />
+            {starterChips("reasoning")}
           </div>
 
           {!isFrozen && (
@@ -266,9 +301,8 @@ export function Phase4Argumentation({
         <div className="right-panel">
           {loading ? (
             <AiEvaluatingIndicator
-              title="อาจารย์ AI กำลังตรวจและคิดคำถาม Socratic..."
-              subtitle="กำลังประมวลผลผ่าน Local Ollama Engine (โปรดรอสักครู่ ระบบกำลังทำงาน ไม่ได้ค้าง)"
-              modelName="ornith:9b"
+              title="AI Coach กำลังอ่านงานของคุณ..."
+              subtitle="กำลังคิดคำถามชวนคิด รอสักครู่ ระบบไม่ได้ค้าง"
             />
           ) : result && isFrozen ? (
             <div className="feedback-wrapper">

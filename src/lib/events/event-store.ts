@@ -99,4 +99,6 @@ export class LearningEventStore {
   }
 }
 
-export const learningEventStore = new LearningEventStore();
+// One store per process: `next dev` re-evaluates this module per route bundle and on HMR.
+const eventGlobal = globalThis as typeof globalThis & { __learningOsEventStore?: LearningEventStore };
+export const learningEventStore = (eventGlobal.__learningOsEventStore ??= new LearningEventStore());

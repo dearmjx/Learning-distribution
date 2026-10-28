@@ -12,7 +12,8 @@ import type {
   TeacherObservationNote,
   TeacherReview,
 } from "@/lib/domain/types";
-import { ecosystemActivities, getActivity } from "@/data/course/ecosystem/activities";
+import { getActivity } from "@/data/course/ecosystem/activities";
+import { ecosystemContentPack } from "@/data/course/ecosystem/content-pack";
 import type {
   ActivityRepository,
   AiSessionRepository,
@@ -26,15 +27,43 @@ import type {
   TeacherReviewRepository,
 } from "@/lib/repository/interfaces";
 
-const submissions: Submission[] = [];
-const revisions: Revision[] = [];
-const aiSessions: AiSession[] = [];
-const aiInteractions: AiInteraction[] = [];
-const peerReviews: PeerReview[] = [];
-const teacherReviews: TeacherReview[] = [];
-const teacherObservationNotes: TeacherObservationNote[] = [];
-const reflections: StudentReflectionData[] = [];
-const customPeerSubmissions: PeerReviewSubmission[] = [];
+interface MemoryStore {
+  submissions: Submission[];
+  revisions: Revision[];
+  aiSessions: AiSession[];
+  aiInteractions: AiInteraction[];
+  peerReviews: PeerReview[];
+  teacherReviews: TeacherReview[];
+  teacherObservationNotes: TeacherObservationNote[];
+  reflections: StudentReflectionData[];
+  customPeerSubmissions: PeerReviewSubmission[];
+}
+
+// `next dev` compiles each route into its own bundle and re-evaluates modules on
+// HMR, so module-level arrays would silently drop demo data. Keep one store per process.
+const memoryGlobal = globalThis as typeof globalThis & { __learningOsMemoryStore?: MemoryStore };
+const memoryStore: MemoryStore = (memoryGlobal.__learningOsMemoryStore ??= {
+  submissions: [],
+  revisions: [],
+  aiSessions: [],
+  aiInteractions: [],
+  peerReviews: [],
+  teacherReviews: [],
+  teacherObservationNotes: [],
+  reflections: [],
+  customPeerSubmissions: [],
+});
+const {
+  submissions,
+  revisions,
+  aiSessions,
+  aiInteractions,
+  peerReviews,
+  teacherReviews,
+  teacherObservationNotes,
+  reflections,
+  customPeerSubmissions,
+} = memoryStore;
 
 export const INITIAL_SYNTHETIC_PEER_SUBMISSIONS: PeerReviewSubmission[] = [
   {
@@ -136,7 +165,7 @@ export class InMemoryLearningRepository
   getCourse(courseId: string): Course | undefined { return courses.find((course) => course.id === courseId); }
   listCourses(schoolId: string): Course[] { return courses.filter((course) => course.schoolId === schoolId); }
   getActivity(activityId: string) { return getActivity(activityId); }
-  listActivities(courseId: string) { return ecosystemActivities.filter((activity) => activity.courseId === courseId); }
+  listActivities(courseId: string) { return ecosystemContentPack.activities.filter((activity) => activity.courseId === courseId); }
   getClassroom(classId: string): Classroom | undefined { return classrooms.find((classroom) => classroom.id === classId); }
   addSubmission(input: Omit<Submission, "id" | "submittedAt">): Submission { return addSubmission(input); }
   getSubmission(submissionId: string): Submission | undefined { return submissions.find((submission) => submission.id === submissionId); }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Activity } from "@/lib/domain/types";
+import { studentFriendlyError } from "@/lib/ui/student-errors";
 
 interface Phase7Props {
   activity: Activity;
@@ -18,7 +19,7 @@ const CONCEPTS_CHECKLIST = [
   "การใช้ AI แบบถามนำ (Socratic) โดยไม่ลอกคำตอบตรงๆ",
 ];
 
-export function Phase7Reflection({ activity, studentId = "demo-student-01", onBack }: Phase7Props) {
+export function Phase7Reflection({ activity, onBack }: Phase7Props) {
   // Research instrument: every answer starts empty and must come from the student (LOS-014).
   const [analyticalScore, setAnalyticalScore] = useState<number | null>(null);
   const [aiLiteracyScore, setAiLiteracyScore] = useState<number | null>(null);
@@ -54,7 +55,6 @@ export function Phase7Reflection({ activity, studentId = "demo-student-01", onBa
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId,
           activityId: activity.id,
           analyticalThinkingScore: analyticalScore,
           aiLiteracyScore: aiLiteracyScore,
@@ -68,7 +68,7 @@ export function Phase7Reflection({ activity, studentId = "demo-student-01", onBa
       if (!response.ok) throw new Error(data.error ?? "บันทึกการสะท้อนคิดไม่สำเร็จ");
       setSubmitted(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการบันทึก");
+      setError(studentFriendlyError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการบันทึก"));
     } finally {
       setSubmitting(false);
     }

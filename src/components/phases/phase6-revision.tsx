@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Activity, CerResponse, CoachFeedback, FeedbackDecision, PeerReview, Submission } from "@/lib/domain/types";
+import { studentFriendlyError } from "@/lib/ui/student-errors";
 
 interface Phase6Props {
   activity: Activity;
@@ -14,12 +15,13 @@ interface Phase6Props {
 
 export function Phase6Revision({
   activity,
-  studentId = "40101",
   initialCer,
   initialFeedback,
   onNext,
   onBack,
 }: Phase6Props) {
+  // Research field: real seconds spent revising, not a constant.
+  const [phaseStartedAt] = useState(() => Date.now());
   const [revisedCer, setRevisedCer] = useState<CerResponse>({
     claim: initialCer.claim,
     evidence: initialCer.evidence,
@@ -102,11 +104,10 @@ export function Phase6Revision({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId,
           activityId: activity.id,
           content: revisedCer,
           hintDepth: "none",
-          responseTimeSeconds: 60,
+          responseTimeSeconds: Math.round((Date.now() - phaseStartedAt) / 1000),
           feedbackDecisions: decisionsList,
         }),
       });
@@ -116,7 +117,7 @@ export function Phase6Revision({
 
       setRevisedSubmission(data.submission);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการบันทึกฉบับปรับปรุง");
+      setError(studentFriendlyError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการบันทึกฉบับปรับปรุง"));
     } finally {
       setSubmitting(false);
     }

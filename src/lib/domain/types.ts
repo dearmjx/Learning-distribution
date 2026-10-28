@@ -172,6 +172,8 @@ export type RubricDimension =
 export interface Activity {
   id: string;
   courseId: string;
+  /** Course pack version the teacher approved; optional for legacy database rows. */
+  contentVersion?: string;
   unit: string;
   /** Stable key used to isolate RAG retrieval to one chapter. */
   chapterId?: string;
@@ -319,6 +321,8 @@ export interface CoachRequest {
 
 export interface CoachResponse {
   requestId: string;
+  /** Stable prompt identifier used to compare teacher-reviewed Coach evaluations. */
+  promptVersion?: string;
   provider: "mock" | "local" | "deepseek" | "fallback";
   message: string;
   targetDimension: RubricDimension;
@@ -348,6 +352,7 @@ export type LearningEventType =
   | "teacher_observation_recorded"
   | "reflection_completed"
   | "learning_phase_changed"
+  | "wizard_progress_saved"
   | "authorship_indicator_created";
 
 export interface LearningEventActor {

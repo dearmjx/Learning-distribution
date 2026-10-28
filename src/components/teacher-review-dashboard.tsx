@@ -212,6 +212,10 @@ export function TeacherReviewDashboard() {
           >
             📥 Export SPSS/R Dataset (CSV)
           </a>
+          {/* Signs this device out of teacher tools; matters on a shared classroom iPad. */}
+          <a className="pill-link" href="/api/teacher/lock">
+            🔒 ล็อกแดชบอร์ด
+          </a>
         </div>
       </header>
 

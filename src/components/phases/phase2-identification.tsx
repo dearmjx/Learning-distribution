@@ -1,20 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Phase2Props {
   onNext: (variablesData: Record<string, string>) => void;
   onBack: () => void;
+  /** Lifts every keystroke so autosave keeps the draft when the student leaves this phase. */
+  onChange?: (variablesData: Record<string, string>) => void;
   savedData?: Record<string, string>;
 }
 
-export function Phase2Identification({ onNext, onBack, savedData }: Phase2Props) {
+export function Phase2Identification({ onNext, onBack, onChange, savedData }: Phase2Props) {
   // Students identify variables themselves; examples live only in placeholders (LOS-014).
   const [independent, setIndependent] = useState(savedData?.independent ?? "");
   const [dependent, setDependent] = useState(savedData?.dependent ?? "");
   const [controlled, setControlled] = useState(savedData?.controlled ?? "");
   const [hypothesis, setHypothesis] = useState(savedData?.hypothesis ?? "");
   const complete = [independent, dependent, controlled, hypothesis].every((value) => value.trim().length > 0);
+
+  useEffect(() => {
+    onChange?.({ independent, dependent, controlled, hypothesis });
+  }, [independent, dependent, controlled, hypothesis, onChange]);
 
   function handleProceed() {
     if (!complete) return;

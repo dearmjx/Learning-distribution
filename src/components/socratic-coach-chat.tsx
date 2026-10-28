@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Activity, CerResponse } from "@/lib/domain/types";
 import { diagnosticLogger } from "@/lib/telemetry-logger";
+import { studentFriendlyError } from "@/lib/ui/student-errors";
 
 export interface MessageItem {
   id: string;
@@ -118,7 +119,6 @@ export function SocraticCoachChat({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentId,
           activityId,
           mode,
           message: text,
@@ -166,7 +166,7 @@ export function SocraticCoachChat({
       setMessages((prev) => [...prev, coachMessage]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI Coach";
-      setError(msg);
+      setError(studentFriendlyError(msg));
     } finally {
       setLoading(false);
     }
@@ -228,7 +228,7 @@ export function SocraticCoachChat({
             <div className="chat-bubble chat-bubble-coach typing-bubble">
               <div className="chat-author-tag">
                 🌿 อาจารย์ AI Coach กำลังคิดคำถาม Socratic...
-                <span className="chat-time">⏱️ {chatSeconds} วินาที (Local Ollama)</span>
+                <span className="chat-time">⏱️ {chatSeconds} วินาที</span>
               </div>
               <div className="typing-dots">
                 <span className="dot dot-1" />

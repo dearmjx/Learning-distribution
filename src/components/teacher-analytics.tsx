@@ -76,6 +76,10 @@ export function TeacherAnalytics() {
           <a className="pill-link" href="/api/research/export">
             📥 Direct JSON Export
           </a>
+          {/* Signs this device out of teacher tools; matters on a shared classroom iPad. */}
+          <a className="pill-link" href="/api/teacher/lock">
+            🔒 ล็อกแดชบอร์ด
+          </a>
         </div>
       </header>
 

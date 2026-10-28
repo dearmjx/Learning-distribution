@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 export interface AdiPhaseStep {
   id: number;
   key: string;
@@ -25,9 +27,20 @@ interface AdiStepperProps {
 }
 
 export function AdiStepper({ currentStep, completedSteps, onSelectStep }: AdiStepperProps) {
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  // On a phone the stepper is a horizontal strip; keep the current phase in view.
+  useEffect(() => {
+    const track = trackRef.current;
+    const node = track?.querySelector<HTMLElement>(".node-current");
+    if (!track || !node || track.scrollWidth <= track.clientWidth) return;
+    const delta = node.getBoundingClientRect().left - track.getBoundingClientRect().left;
+    track.scrollLeft += delta - (track.clientWidth - node.offsetWidth) / 2;
+  }, [currentStep]);
+
   return (
     <nav aria-label="ADI 7-Phase Progress" className="stepper-wrapper">
-      <div className="stepper-track">
+      <div className="stepper-track" ref={trackRef}>
         {ADI_PHASES.map((phase) => {
           const isCompleted = completedSteps.includes(phase.id);
           const isCurrent = currentStep === phase.id;
@@ -42,6 +55,7 @@ export function AdiStepper({ currentStep, completedSteps, onSelectStep }: AdiSte
                 if (isAccessible) onSelectStep(phase.id);
               }}
               disabled={!isAccessible}
+              aria-current={isCurrent ? "step" : undefined}
               title={`${phase.name} (${phase.thaiName})`}
             >
               <div className="node-circle">

@@ -3,9 +3,14 @@ import { LocalProvider } from "@/lib/ai/local-provider";
 import { chatWithCoach } from "@/lib/ai/coach";
 import { getActivity } from "@/data/course/ecosystem/activities";
 
-describe("Ollama Local Provider Integration", () => {
-  it("connects and receives a direct completion from local Ollama", async () => {
-    const provider = new LocalProvider("http://localhost:11434/v1", "ornith:9b");
+// Live check against the classroom runtime. LM Studio is the default because Ollama 0.33 runs
+// qwen3.5 one request at a time; override with LOCAL_LLM_BASE_URL / LOCAL_LLM_MODEL.
+const BASE_URL = process.env.LOCAL_LLM_BASE_URL ?? "http://localhost:1234/v1";
+const MODEL = process.env.LOCAL_LLM_MODEL ?? "qwen3.5-4b";
+
+describe("Local LLM provider integration (LM Studio / Ollama)", () => {
+  it("connects and receives a direct completion from the local LLM", async () => {
+    const provider = new LocalProvider(BASE_URL, MODEL);
     try {
       const response = await provider.complete([
         { role: "system", content: "You are a helpful science coach. Answer briefly in Thai." },
@@ -22,7 +27,7 @@ describe("Ollama Local Provider Integration", () => {
   }, 60000);
 
   it("integrates with chatWithCoach for Socratic guidance", async () => {
-    const provider = new LocalProvider("http://localhost:11434/v1", "ornith:9b");
+    const provider = new LocalProvider(BASE_URL, MODEL);
     const activity = getActivity("ecosystem-food-web-01");
     if (!activity) throw new Error("Activity not found");
 

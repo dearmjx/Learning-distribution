@@ -81,9 +81,13 @@ research-source/
 แผน migration หลักอยู่ที่ [`docs/phase-x.md`](docs/phase-x.md)
 วิธีเพิ่มบทเรียนและปรับ RAG อยู่ที่ [`docs/CUSTOMIZE_RAG.md`](docs/CUSTOMIZE_RAG.md)
 ส่วนเอกสารต้นฉบับจาก ZIP อยู่ที่ [`research-source/`](research-source/)
+ลำดับการปรับปรุงและข้อจำกัดปัจจุบันอยู่ที่ [`docs/IMPROVEMENT_ROADMAP.md`](docs/IMPROVEMENT_ROADMAP.md)
+แนวทางประเมิน AI Coach และ RAG อยู่ที่ [`docs/COACH_EVALUATION.md`](docs/COACH_EVALUATION.md)
+รูปแบบเนื้อหาที่ใช้ซ้ำและการเพิ่มบทเรียนอยู่ที่ [`docs/COURSE_CONTENT_PACKS.md`](docs/COURSE_CONTENT_PACKS.md)
 
 ## Important limitation
 
 ตอนนี้ repository เป็น MVP แบบ in-memory เพื่อให้ทดสอบ interaction flow ได้เร็ว ข้อมูลจะหายเมื่อ process restart
+ตัวช่วยบันทึกความคืบหน้าของผู้เรียนเก็บข้อมูลผ่าน repository และ event store; ใน memory mode ข้อมูลก็ยังหายเมื่อ process restart เช่นเดิม
 RAG มี approved knowledge registry แบบ static และใช้ Thai-aware BM25 เป็นค่าเริ่มต้น โดยมี port สำหรับต่อ dense/vector retriever แล้ว แต่ยังไม่ได้ต่อ knowledge repository กับ pgvector
-ขั้นถัดไปคือเปลี่ยน repository เป็น Postgres/Supabase, ต่อ vector knowledge store และทำ consent/authentication ก่อน pilot กับนักเรียนจริง
+Production readiness ปฏิเสธ memory persistence เว้นแต่เปิด demo gate และ opt-in สำหรับข้อมูลสังเคราะห์ไว้ชัดเจน การทดลองกับนักเรียนจริงยังต้องมี Supabase Auth/RLS ที่ผ่านการตรวจสอบ, consent, retention/deletion, data residency และการอนุมัติจากโรงเรียนก่อน

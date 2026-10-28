@@ -10,6 +10,7 @@ export type KnowledgeDocumentType = "lesson" | "rubric" | "objective" | "example
 export interface KnowledgeChunk {
   id: string;
   courseId: string;
+  contentVersion?: string;
   chapterId: string;
   chapterTitle: string;
   activityIds?: readonly string[];

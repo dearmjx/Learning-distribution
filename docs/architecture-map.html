@@ -1,0 +1,797 @@
+<title>Learning OS Architecture Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column with a sticky section rail; diagrams and tables scroll inside their own frames. */
+:root {
+  --bg: #f4f7f4;
+  --surface: #ffffff;
+  --surface-2: #eef3ef;
+  --ink: #13221c;
+  --muted: #56685f;
+  --line: #d6e0d8;
+  --accent: #1d6b4f;
+  --accent-ink: #ffffff;
+  --accent-soft: #dcefe5;
+  --line-green: #06c755;
+  --ok: #1e7a46;
+  --ok-soft: #e1f3e8;
+  --warn: #9a6200;
+  --warn-soft: #fbf0d9;
+  --crit: #b3261e;
+  --crit-soft: #fbe5e3;
+  --info: #2b5c9e;
+  --info-soft: #e3ecf8;
+  --code-bg: #eef2ee;
+  --font-display: "Bai Jamjuree", "IBM Plex Sans Thai", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans Thai", "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1613; --surface: #16201b; --surface-2: #1c2822; --ink: #e4ece7; --muted: #9db1a6; --line: #2b3a32;
+    --accent: #5fc39a; --accent-ink: #0b1511; --accent-soft: #1f3a2e; --line-green: #3ddc84;
+    --ok: #6fd39a; --ok-soft: #173326; --warn: #f0b44c; --warn-soft: #3a2c10; --crit: #ff8a80; --crit-soft: #3d1a17;
+    --info: #8db8f2; --info-soft: #182a42; --code-bg: #1c2822; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1613; --surface: #16201b; --surface-2: #1c2822; --ink: #e4ece7; --muted: #9db1a6; --line: #2b3a32;
+  --accent: #5fc39a; --accent-ink: #0b1511; --accent-soft: #1f3a2e; --line-green: #3ddc84;
+  --ok: #6fd39a; --ok-soft: #173326; --warn: #f0b44c; --warn-soft: #3a2c10; --crit: #ff8a80; --crit-soft: #3d1a17;
+  --info: #8db8f2; --info-soft: #182a42; --code-bg: #1c2822; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15.5px; line-height: 1.7;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 28px 64px; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.25; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); font-weight: 700; }
+h2 { font-size: 1.55rem; font-weight: 700; }
+h3 { font-size: 1.12rem; font-weight: 600; }
+p { margin: 0; max-width: 72ch; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--code-bg); padding: 1px 6px; border-radius: 5px; overflow-wrap: anywhere; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+header.top { display: grid; gap: 14px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+.lede { color: var(--muted); font-size: 1.05rem; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.rail {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+  display: flex; gap: 4px; overflow-x: auto; padding-block: 10px; margin-bottom: 8px;
+  scrollbar-width: thin;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.rail a {
+  flex: 0 0 auto; text-decoration: none; color: var(--muted); font-size: 13.5px;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid transparent;
+}
+.rail a:hover, .rail a:focus-visible { color: var(--ink); border-color: var(--line); background: var(--surface); outline: none; }
+
+section { display: grid; gap: 16px; padding-block: 34px 6px; scroll-margin-top: 64px; }
+.sec-head { display: grid; gap: 6px; }
+.sec-head p { color: var(--muted); }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.ok { color: var(--ok); background: var(--ok-soft); }
+.warn { color: var(--warn); background: var(--warn-soft); }
+.crit { color: var(--crit); background: var(--crit-soft); }
+.info { color: var(--info); background: var(--info-soft); }
+.neutral { color: var(--muted); background: var(--surface-2); }
+
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.panel ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
+.panel li::marker { color: var(--accent); }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; overflow-x: auto; }
+.diagram pre.mermaid { margin: 0; background: transparent; min-width: 640px; }
+.cap { font-size: 13px; color: var(--muted); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 640px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+th { font-family: var(--font-display); font-weight: 600; background: var(--surface-2); font-size: 13.5px; }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); font-size: 13px; white-space: nowrap; }
+
+.finding { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; padding: 14px 16px; border-top: 1px solid var(--line); }
+.finding:first-child { border-top: 0; }
+.finding .what { font-weight: 600; }
+.finding .why { grid-column: 2; color: var(--muted); font-size: 14px; }
+.finding .where { grid-column: 2; font-size: 13px; }
+.list-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+
+.callout { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 14px 16px; border-radius: 0 10px 10px 0; display: grid; gap: 6px; }
+.callout.line { border-color: var(--line-green); }
+.quote { font-size: 1.06rem; font-family: var(--font-display); font-weight: 500; }
+
+.phase-row { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.phase { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 8px; align-content: start; }
+.phase .when { font-family: var(--font-mono); font-size: 12px; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; }
+.phase ol { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: 14px; }
+
+.msg { background: var(--surface-2); border-radius: 14px; padding: 12px 14px; font-size: 14px; display: grid; gap: 4px; }
+.msg b { font-family: var(--font-display); }
+footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
+footer ul { margin: 0; padding-left: 1.1em; }
+@media (max-width: 560px) {
+  body { font-size: 15px; }
+  .finding { grid-template-columns: 1fr; }
+  .finding .why, .finding .where { grid-column: 1; }
+  .kv { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Learning OS · ชีววิทยา ม.4 · ADI / CER · audit 28 ต.ค. 2026</span>
+    <h1>Learning OS Architecture Map</h1>
+    <p class="lede">แผนที่ระบบปัจจุบันแบบลงลึก (Frontend · Backend · Database · AI) ผลตรวจหน้าเว็บจริง ผลทดสอบ LM Studio และ Ollama และแผน soon-to-be ทั้งระบบ รวมการแจ้งรายงานผ่าน LINE Official Account ถึงครู ผู้ปกครอง และนักเรียน</p>
+    <div class="meta-row">
+      <span class="chip ok">Typecheck ผ่าน · 74/74 tests</span>
+      <span class="chip ok">Flow นักเรียน Phase 1→4 + chat ผ่านในเบราว์เซอร์</span>
+      <span class="chip ok">Qwen 3.5 4B บน LM Studio · 30 คนพร้อมกัน 30/30</span>
+      <span class="chip warn">Phase 5–7 ยังไม่ทดสอบจนจบ</span>
+      <span class="chip neutral">branch codex/learning-os-improvements · ยังไม่ commit</span>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="สารบัญ">
+    <a href="#summary">สรุป</a>
+    <a href="#current">ระบบปัจจุบัน</a>
+    <a href="#frontend">Frontend</a>
+    <a href="#backend">Backend</a>
+    <a href="#database">Database</a>
+    <a href="#ai">AI / LLM</a>
+    <a href="#llm-test">ผลทดสอบ LLM</a>
+    <a href="#audit">ผล audit</a>
+    <a href="#research">โปรเจกต์อ้างอิง</a>
+    <a href="#brainstorm">Brainstorm</a>
+    <a href="#future">Soon-to-be</a>
+    <a href="#line">LINE OA</a>
+    <a href="#roadmap">Roadmap</a>
+  </nav>
+
+  <section id="summary">
+    <div class="sec-head">
+      <span class="eyebrow">สรุปสำหรับคนรีบ</span>
+      <h2>วันนี้ระบบพังตรงไหน และแก้อะไรไปแล้ว</h2>
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <span class="chip crit">ก่อนแก้: นักเรียนไปต่อไม่ได้</span>
+        <p>ในโหมด demo ปุ่ม Freeze Draft 1 ตอบ <code>403</code> ทุกครั้ง เพราะหน้าเว็บส่งรหัสนักเรียนจาก dropdown (40101) แต่เซิร์ฟเวอร์ล็อกตัวตนไว้เป็น <code>demo-student-01</code> ทำให้ Phase 4–7 ใช้ไม่ได้ทั้งหมด</p>
+      </div>
+      <div class="panel">
+        <span class="chip crit">ก่อนแก้: AI ค้างไม่มีกำหนด</span>
+        <p>คำขอไป <code>ornith:9b</code> ค้างนานกว่า 5 นาทีโดยไม่มี timeout โมเดลโหลดเข้า VRAM ได้แค่ 4.1 จาก 7 GB ส่วน Qwen 3.5 แบบ thinking ใช้ token หมดกับการคิดในหัวจนคำตอบว่าง</p>
+      </div>
+      <div class="panel">
+        <span class="chip ok">หลังแก้</span>
+        <p>ตัวตนมาจาก session ฝั่งเซิร์ฟเวอร์เท่านั้น ตั้ง timeout 90 วินาที ปิด thinking ด้วย <code>reasoning_effort: "none"</code> ใช้ Qwen 3.5 4B เป็นค่าเริ่มต้น งานที่พิมพ์ค้างไม่หาย UI ใช้บน iPhone/iPad ได้ และแดชบอร์ดครูมีรหัสล็อก</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="current">
+    <div class="sec-head">
+      <span class="eyebrow">Current state</span>
+      <h2>ภาพรวมระบบปัจจุบัน</h2>
+      <p>Next.js 15 (App Router) ตัวเดียวทำทั้งหน้าเว็บและ API เก็บข้อมูลได้ 2 แบบ: <code>memory</code> สำหรับ demo และ <code>supabase</code> สำหรับ pilot จริง AI วิ่งบนเครื่องผ่าน API แบบ OpenAI-compatible</p>
+    </div>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  subgraph Client["อุปกรณ์ (iPhone · iPad · Chromebook)"]
+    S["หน้านักเรียน /\nStudentWorkbench 7 phases"]
+    T["หน้าครู /teacher/*\nreview · roster · analytics"]
+  end
+  subgraph Next["Next.js 15 server (เครื่องครู/โรงเรียน)"]
+    MW["middleware.ts\nSupabase session refresh\nTeacher gate · Demo gate"]
+    API["Route handlers /api/*\n15 endpoints"]
+    ID["resolveLearningIdentity\nrole + class scope"]
+    COACH["Coach engine\nprompt + guardrail + fallback"]
+    RAG["Hybrid RAG\nBM25 + dense (RRF)"]
+    REPO["Repository port"]
+  end
+  subgraph Data["ข้อมูล"]
+    MEM[("Memory store\nglobalThis · demo")]
+    SB[("Supabase Postgres\n21 tables · RLS · RPC")]
+  end
+  subgraph LLM["LLM บนเครื่อง"]
+    OL["Ollama :11434\nqwen3.5:4b"]
+    LM["LM Studio :1234\nqwen3.5-4b"]
+    MOCK["Mock fallback"]
+  end
+  S --> MW
+  T --> MW
+  MW --> API
+  API --> ID --> REPO
+  REPO --> MEM
+  REPO --> SB
+  API --> COACH --> RAG
+  COACH -->|reasoning_effort none\njson_schema · parallel 4| LM
+  COACH -.->|เลือกได้ผ่าน env\nตอบทีละคน| OL
+  COACH -.->|timeout/ผิดกฎ| MOCK
+</pre>
+    </div>
+    <p class="cap">เส้นทึบคือเส้นทางที่ใช้ใน <code>.env.local</code> ตอนนี้ เส้นประคือทางเลือกและ fallback</p>
+  </section>
+
+  <section id="frontend">
+    <div class="sec-head">
+      <span class="eyebrow">Frontend</span>
+      <h2>หน้าเว็บและ component</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Route</th><th>Component หลัก</th><th>ใครใช้</th><th>หมายเหตุ</th></tr></thead>
+        <tbody>
+          <tr><td><code>/</code>, <code>/student/activity</code></td><td><code>StudentWorkbench</code> + <code>phases/phase1…7</code></td><td>นักเรียน</td><td>autosave ทุก 700 ms ไป <code>/api/progress</code> · stepper 7 ขั้น</td></tr>
+          <tr><td><code>/student/timeline</code></td><td><code>StudentTimeline</code></td><td>นักเรียน</td><td>เหตุการณ์ของตัวเองเท่านั้น</td></tr>
+          <tr><td><code>/teacher/review</code></td><td><code>TeacherReviewDashboard</code> (793 บรรทัด)</td><td>ครู</td><td>rubric 4 มิติ + CER, export CSV SPSS/R</td></tr>
+          <tr><td><code>/teacher/roster</code></td><td><code>TeacherRosterView</code></td><td>ครู</td><td>รายชื่อจาก membership จริงในโหมด Supabase</td></tr>
+          <tr><td><code>/teacher/analytics</code></td><td><code>TeacherAnalytics</code>, <code>GrowthAnalyticsPanel</code></td><td>ครู / นักวิจัย</td><td>pre/post growth</td></tr>
+          <tr><td><code>/teacher/unlock</code> <span class="chip ok">ใหม่</span></td><td><code>TeacherUnlockForm</code></td><td>ครู</td><td>รหัส 3.14 · แป้นตัวเลขบน iPhone/iPad</td></tr>
+          <tr><td><code>/demo</code></td><td><code>DemoLoginForm</code></td><td>ผู้นำเสนอ</td><td>ล็อกทั้งเว็บด้วยรหัส demo</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <h3>Phase ที่นักเรียนผ่าน</h3>
+        <ul>
+          <li>1 ปรากฏการณ์ · 2 ตัวแปร/สมมติฐาน · 3 ข้อมูลสืบเสาะ</li>
+          <li>4 เขียน CER แล้ว Freeze Draft 1 เพื่อเก็บ baseline วิจัยก่อนรับ AI</li>
+          <li>5 ประเมินเพื่อนแบบไม่ระบุชื่อ · 6 ตัดสินใจรับ/ปฏิเสธ feedback แล้วเขียน v2</li>
+          <li>7 สะท้อนคิด + self-rating</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>สิ่งที่เปลี่ยนวันนี้ในหน้านักเรียน</h3>
+        <ul>
+          <li>เอา dropdown เลือกห้อง/รหัสปลอมออก แสดงตัวตนจากเซิร์ฟเวอร์</li>
+          <li>ภาษาบนหัวหน้าเป็นภาษานักเรียน ไม่มีคำว่า CAR / PAOR / Telemetry</li>
+          <li>ซ่อนแผง LLM Telemetry ไว้หลัง <code>?debug=1</code></li>
+          <li>ปุ่มช่วยเริ่มประโยค CER และข้อความ error ภาษาไทยที่บอกว่าต้องทำอะไรต่อ</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="backend">
+    <div class="sec-head">
+      <span class="eyebrow">Backend</span>
+      <h2>API routes</h2>
+      <p>ทุก route ที่เกี่ยวกับนักเรียนเรียก <code>resolveLearningIdentity</code> ก่อน ถ้า client ส่ง studentId ที่ไม่ตรงกับ session จะได้ 403 การออกแบบนี้ถูก ปัญหาอยู่ที่ฝั่งหน้าเว็บที่ส่งค่าผิดไป</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Endpoint</th><th>Method</th><th>ทำอะไร</th><th>ป้องกันด้วย</th></tr></thead>
+        <tbody>
+          <tr><td><code>/api/activities</code></td><td>GET</td><td>กิจกรรม + session identity</td><td>identity</td></tr>
+          <tr><td><code>/api/progress</code></td><td>GET/POST</td><td>สถานะ wizard (event <code>wizard_progress_saved</code>)</td><td>identity · idempotency key</td></tr>
+          <tr><td><code>/api/sessions</code></td><td>GET/POST</td><td>ส่ง CER → เรียก coach → บันทึก submission/revision/interaction</td><td>identity · schema · rate limit</td></tr>
+          <tr><td><code>/api/coach/chat</code></td><td>POST</td><td>Socratic chat · โหมดฝ่ายค้าน</td><td>gate ต้อง freeze ก่อน · strict guardrail · 6 ครั้ง/นาที</td></tr>
+          <tr><td><code>/api/peer-reviews</code></td><td>GET/POST</td><td>งานเพื่อนที่ได้รับมอบหมาย · รีวิวที่ได้รับ</td><td>RPC <code>submit_peer_review</code></td></tr>
+          <tr><td><code>/api/reflections</code></td><td>GET/POST</td><td>Phase 7</td><td>identity</td></tr>
+          <tr><td><code>/api/teacher/{reviews,roster,observations}</code></td><td>GET/POST</td><td>งานครู</td><td>role teacher · <span class="chip ok">teacher gate ใหม่</span></td></tr>
+          <tr><td><code>/api/research/export</code></td><td>GET</td><td>dataset วิจัย (participant key แบบ HMAC)</td><td>researcher · consent · <span class="chip ok">teacher gate</span></td></tr>
+          <tr><td><code>/api/teacher/unlock</code>, <code>/lock</code></td><td>POST/GET</td><td>ปลดล็อก/ล็อกแดชบอร์ด</td><td>HMAC cookie 8 ชม. · 10 ครั้ง/นาที</td></tr>
+          <tr><td><code>/api/health</code>, <code>/api/ready</code></td><td>GET</td><td>health + LLM reachable</td><td>public</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant N as นักเรียน (iPad)
+  participant W as StudentWorkbench
+  participant A as /api/sessions
+  participant I as Identity
+  participant C as Coach
+  participant L as Qwen 3.5 4B
+  participant R as Repository
+  N->>W: กด Freeze Draft 1
+  W->>A: POST {activityId, content, hintDepth, responseTimeSeconds}
+  A->>I: resolveLearningIdentity (session)
+  I-->>A: studentId จากเซิร์ฟเวอร์
+  A->>R: บันทึก Draft 1 (immutable)
+  A->>C: generateCoachFeedback
+  C->>L: chat/completions · reasoning_effort none · json_schema · timeout 90s
+  L-->>C: {"message": "...?"}
+  C->>C: guardrail Socratic (ต้องเป็นคำถาม · ไม่เฉลย)
+  alt ผ่าน
+    C-->>A: feedback จาก local
+  else ไม่ผ่าน / timeout
+    C-->>A: fallback question
+  end
+  A->>R: บันทึก interaction + event
+  A-->>W: submission + feedback
+  W-->>N: คำถามชวนคิด + เปิด mini-chat
+</pre>
+    </div>
+    <p class="cap">ลำดับเมื่อนักเรียนกด Freeze (Phase 4) หลังแก้วันนี้</p>
+  </section>
+
+  <section id="database">
+    <div class="sec-head">
+      <span class="eyebrow">Database</span>
+      <h2>Supabase Postgres · 13 migrations · 21 tables</h2>
+      <p>ทุกตารางเปิด RLS นโยบายรุ่นแรกที่หลวมเกินไปถูก drop ไปแล้วใน migration 006 สิทธิ์จริงอยู่ในฟังก์ชัน <code>active_class_member</code>, <code>is_teacher</code>, <code>can_access_submission</code>, <code>consented_student_ids</code></p>
+    </div>
+    <div class="diagram">
+<pre class="mermaid">
+erDiagram
+  schools ||--o{ courses : has
+  courses ||--o{ classes : has
+  classes ||--o{ memberships : has
+  learning_profiles ||--o{ memberships : joins
+  courses ||--o{ activities : has
+  activities ||--o{ activity_assignments : assigned
+  classes ||--o{ activity_assignments : receives
+  learning_profiles ||--o{ submissions : writes
+  activities ||--o{ submissions : for
+  submissions ||--o{ revisions : versions
+  submissions ||--o{ peer_reviews : reviewed
+  submissions ||--o{ teacher_reviews : graded
+  learning_profiles ||--o{ ai_sessions : opens
+  ai_sessions ||--o{ ai_interactions : logs
+  ai_interactions ||--o{ hints : costs
+  learning_profiles ||--o{ learning_events : emits
+  learning_profiles ||--o{ reflections : writes
+  learning_profiles ||--o{ consent_records : gives
+  learning_profiles ||--o| research_identity_mapping : keyed
+  classes ||--o{ teacher_observation_notes : notes
+</pre>
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <h3>จุดแข็ง</h3>
+        <ul>
+          <li>Draft 1 แก้ไม่ได้ด้วย trigger <code>prevent_submission_content_change</code></li>
+          <li>Peer review ผ่าน RPC ที่ซ่อนชื่อผู้เขียน</li>
+          <li>Export วิจัยใช้ participant key แบบ HMAC และเช็ก consent</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>ควรเก็บกวาด</h3>
+        <ul>
+          <li>ตาราง <code>profiles</code> รุ่นแรกยังอยู่ แต่โค้ดใช้ <code>learning_profiles</code> แล้ว</li>
+          <li><code>synthetic_peer_drafts</code> ควรแยก schema demo ออกจาก pilot</li>
+          <li>ยังไม่มีตารางสำหรับช่องทางแจ้งเตือน (ดูส่วน LINE OA)</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Memory mode (demo)</h3>
+        <p>เดิมเก็บใน array ระดับ module ซึ่ง <code>next dev</code> สร้างใหม่ทุกครั้งที่ compile route จึงทำงานที่บันทึกแล้วหายเงียบ ๆ วันนี้ย้ายไปเก็บบน <code>globalThis</code> แล้ว</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="ai">
+    <div class="sec-head">
+      <span class="eyebrow">AI / LLM layer</span>
+      <h2>Coach engine</h2>
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <h3>Providers</h3>
+        <dl class="kv">
+          <dt>local</dt><dd><code>LocalProvider</code> OpenAI-compatible (Ollama / LM Studio)</dd>
+          <dt>deepseek</dt><dd>opt-in ผ่าน env เท่านั้น</dd>
+          <dt>mock</dt><dd>fallback เมื่อ local ล้มหรือผิดกฎ</dd>
+        </dl>
+      </div>
+      <div class="panel">
+        <h3>Guardrails</h3>
+        <ul>
+          <li>ห้ามเฉลย ห้ามเขียนงานแทน ห้ามให้คะแนน</li>
+          <li>ต้องเป็นคำถาม (มี <code>?</code> หรือคำถาม) ยาวไม่เกิน 850 ตัวอักษร</li>
+          <li>ใช้เฉพาะ <code>&lt;approved_context&gt;</code> ที่ครูอนุมัติ</li>
+          <li>chat ทุกข้อความผ่าน strict guardrail</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>ค่าใน .env.local ตอนนี้</h3>
+        <dl class="kv">
+          <dt>provider</dt><dd><code>local</code></dd>
+          <dt>base url</dt><dd><code>http://localhost:1234/v1</code> (LM Studio)</dd>
+          <dt>model</dt><dd><code>qwen3.5-4b</code></dd>
+          <dt>timeout</dt><dd>90 วินาที (ค่าเริ่มต้น)</dd>
+          <dt>thinking</dt><dd>ปิด (<code>reasoning_effort: none</code>)</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section id="llm-test">
+    <div class="sec-head">
+      <span class="eyebrow">LM Studio + Ollama · ทดสอบจริงบนเครื่องนี้</span>
+      <h2>ผลทดสอบ LLM</h2>
+      <p>ใช้ prompt จริงของแอป 3 แบบ: feedback แบบ JSON (Phase 4), chat ถามนำ, และข้อความพยายามให้ AI เขียนงานแทน ทั้ง Ollama 0.33.3 และ LM Studio (CLI <code>lms</code>, server :1234)</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Runtime · โมเดล</th><th>ตั้งค่า</th><th>Phase 4 JSON</th><th>Chat</th><th>ผล</th></tr></thead>
+        <tbody>
+          <tr><td>Ollama · ornith:9b</td><td>ค่าเดิม (thinking เปิด)</td><td class="num">25.6 s</td><td class="num">15.1 s · 13.5 t/s</td><td><span class="chip warn">ใช้ได้แต่ช้า</span> VRAM 4.1/7 GB</td></tr>
+          <tr><td>Ollama · qwen3.5:4b</td><td>thinking เปิด</td><td class="num">คำตอบว่าง</td><td class="num">คำตอบว่าง</td><td><span class="chip crit">ใช้ไม่ได้</span> token หมดกับการคิด</td></tr>
+          <tr><td>LM Studio · qwen3.5-4b</td><td><code>json_object</code></td><td class="num">HTTP 400</td><td class="num">คำตอบว่าง</td><td><span class="chip crit">ใช้ไม่ได้</span> ต้องใช้ json_schema</td></tr>
+          <tr><td>Ollama · qwen3.5:4b</td><td><code>think: false</code> / chat_template_kwargs / /no_think</td><td class="num">คำตอบว่าง</td><td class="num">คำตอบว่าง</td><td><span class="chip crit">ไม่ได้ผล</span></td></tr>
+          <tr><td>Ollama · qwen3.5:4b</td><td><code>reasoning_effort: none</code> + json_schema</td><td class="num">1.3–1.8 s</td><td class="num">2.9 s</td><td><span class="chip ok">ใช้งานจริง</span> 5/5 ผ่าน guardrail</td></tr>
+          <tr><td>LM Studio · qwen3.5-4b</td><td><code>reasoning_effort: none</code> + json_schema</td><td class="num">1.1–1.2 s</td><td class="num">2.0 s</td><td><span class="chip ok">ใช้งานจริง</span> 3/3 ผ่าน guardrail</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <span class="quote">ตัวอย่างคำถามจาก Qwen 3.5 4B ผ่าน pipeline จริงของแอป</span>
+      <p>“หากงูลดลงทำให้หนูเพิ่มขึ้น พลังงานในระบบนิเวศนี้จะเปลี่ยนแปลงอย่างไร?” (Ollama, 1.3 วินาที)</p>
+      <p>“หากจำนวนงูลดลงทำให้พืชลดลงตามที่คุณกล่าวอ้าง พลังงานในระบบนิเวศจะเปลี่ยนแปลงอย่างไร?” (LM Studio, 1.1 วินาที)</p>
+    </div>
+    <h3>นักเรียน 20 คนส่งพร้อมกัน · RTX 4050 Laptop 6 GB</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Runtime</th><th>ตั้งค่า</th><th>สำเร็จ</th><th>รอทั้งชุด</th><th>คนกลาง (p50)</th><th>p90</th><th>ช้าสุด</th><th>token/s รวม</th><th>GPU เฉลี่ย</th></tr></thead>
+        <tbody>
+          <tr><td>Ollama 0.33.3</td><td>ค่าเดิม · ctx 32K · VRAM 3.7/4.8 GB</td><td class="num">20/20</td><td class="num">53.0 s</td><td class="num">24.7 s</td><td class="num">48.0 s</td><td class="num">53.0 s</td><td class="num">31.6</td><td class="num">55%</td></tr>
+          <tr><td>Ollama 0.33.3</td><td>NUM_PARALLEL 4 · ctx 8K · flash attn · VRAM เต็ม</td><td class="num">20/20</td><td class="num">43.0 s</td><td class="num">20.7 s</td><td class="num">38.2 s</td><td class="num">43.0 s</td><td class="num">40.3</td><td class="num">89%</td></tr>
+          <tr><td><b>LM Studio</b></td><td>parallel 4 · ctx 8K · VRAM เต็ม</td><td class="num">20/20</td><td class="num"><b>19.3 s</b></td><td class="num"><b>9.8 s</b></td><td class="num">17.7 s</td><td class="num">19.3 s</td><td class="num"><b>90.4</b></td><td class="num">81%</td></tr>
+          <tr><td><b>LM Studio · 30 คน</b></td><td>เหมือนข้างบน · GPU ว่าง</td><td class="num">30/30</td><td class="num">29.3 s</td><td class="num">16.4 s</td><td class="num">27.4 s</td><td class="num">29.3 s</td><td class="num">90.0</td><td class="num">81%</td></tr>
+          <tr><td>LM Studio · 30 คน ผ่านโค้ด coach ของแอป</td><td>15 Freeze + 15 chat</td><td class="num">30/30</td><td class="num">34.1 s</td><td class="num">13.0 s</td><td class="num">–</td><td class="num">34.1 s</td><td class="num">–</td><td class="num">–</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="cap">30 คนผ่านโค้ดของแอป: Freeze ได้คำตอบจาก Qwen 15/15 ไม่มี fallback · chat ได้คำตอบจากโมเดล 13/15 อีก 2 ถูก guardrail แทนด้วยคำถามมาตรฐาน · throughput คงที่ ~90 token/s คือเพดานของ GPU นักเรียนแต่ละคนที่เพิ่มทำให้คนสุดท้ายรอเพิ่ม ~1 วินาที</p>
+    <div class="callout">
+      <span class="quote">ใช้ LM Studio สำหรับห้องเรียน</span>
+      <p>log ของ Ollama ระบุว่า “model architecture does not currently support parallel requests” (architecture=qwen35) จึงบังคับ <code>-np 1</code> ตอบทีละคน ไม่ว่าจะตั้ง <code>OLLAMA_NUM_PARALLEL</code> เท่าไร LM Studio รัน Qwen 3.5 4B แบบขนาน 4 ช่องได้ เร็วกว่า 2.7 เท่า ไม่มีคำขอไหนเกิน timeout 90 วินาทีของแอปในทุกการทดสอบ</p>
+      <p>ผ่าน pipeline chat จริงของแอปบน LM Studio 20 คนพร้อมกัน: โมเดลตอบเอง 20/20 ไม่ถูก guardrail แทนที่ หลังเพิ่มกฎ “ต้องลงท้ายด้วย ?” ใน prompt chat (ก่อนเพิ่ม 25–50% ของคำตอบ chat เป็นประโยคบอกเล่า)</p>
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <h3>สิ่งที่แก้ใน LocalProvider</h3>
+        <ul>
+          <li>ส่ง <code>reasoning_effort: "none"</code> เป็นค่าเริ่มต้น (ปิดได้ด้วย <code>LOCAL_LLM_REASONING_EFFORT=off</code>)</li>
+          <li>JSON mode ใช้ <code>json_schema</code> ที่ทั้งสอง runtime รับ</li>
+          <li>timeout 90 วินาที แล้ว fallback</li>
+          <li>เลิกดึง <code>reasoning_content</code> มาแสดง เพราะเป็นความคิดภายในของโมเดล ไม่ควรถึงมือนักเรียน</li>
+          <li>prompt บังคับให้ลงท้ายด้วย <code>?</code> เพราะเดิม Qwen ตอบเป็นประโยคสั่ง (“ลองเชื่อมโยง…”) แล้วโดน guardrail แทนที่ทุกครั้ง</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>ยังไม่ได้ทดสอบ</h3>
+        <ul>
+          <li>การใช้งานต่อเนื่องทั้งคาบ 50 นาที (ทดสอบแล้วแค่ burst 30 คนครั้งเดียว)</li>
+          <li>ชุด coach-evaluation เต็มชุด (<code>docs/COACH_EVALUATION.md</code>) กับ Qwen</li>
+          <li>คำชมแบบตัดสิน เช่น “เยี่ยมเลย คุณเข้าใจดีมาก” ที่ chat ยังพูดอยู่</li>
+        </ul>
+        <p class="cap">สลับไป LM Studio: <code>LOCAL_LLM_BASE_URL=http://localhost:1234/v1</code> และ <code>LOCAL_LLM_MODEL=qwen3.5-4b</code></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="audit">
+    <div class="sec-head">
+      <span class="eyebrow">Frontend audit · เปิดเว็บจริงใน browser pane</span>
+      <h2>ผล audit</h2>
+    </div>
+    <h3>แก้แล้ววันนี้</h3>
+    <div class="list-card">
+      <div class="finding"><span class="chip crit">blocker</span><span class="what">Freeze Draft 1 / peer review / revision / reflection ตอบ 403 ในโหมด demo</span><span class="why">client ส่ง studentId จาก dropdown ไม่ตรง session · แก้: ไม่ส่ง studentId และเอา dropdown ปลอมออก</span><span class="where"><code>student-workbench.tsx</code>, <code>phases/phase4–7</code>, <code>socratic-coach-chat.tsx</code></span></div>
+      <div class="finding"><span class="chip crit">blocker</span><span class="what">คำขอ AI ค้างไม่มีกำหนด</span><span class="why">ไม่มี timeout · แก้: AbortSignal.timeout 90 s แล้ว fallback</span><span class="where"><code>lib/ai/local-provider.ts</code></span></div>
+      <div class="finding"><span class="chip crit">high</span><span class="what">ข้อมูลวิจัยปลอม: responseTimeSeconds เป็นค่าคงที่ 120 และ 60</span><span class="why">ขัดกับ LOS-014 · แก้: วัดเวลาจริงตั้งแต่เข้า phase</span><span class="where"><code>phase4-argumentation.tsx</code>, <code>phase6-revision.tsx</code></span></div>
+      <div class="finding"><span class="chip warn">high</span><span class="what">คำตอบ Phase 2 หายเมื่อกดย้อนบน stepper หรือรีเฟรช</span><span class="why">state อยู่ใน component · แก้: ส่งทุกการพิมพ์ขึ้น parent ให้ autosave (ทดสอบรีโหลดแล้วข้อมูลอยู่ครบ)</span><span class="where"><code>phase2-identification.tsx</code></span></div>
+      <div class="finding"><span class="chip warn">high</span><span class="what">Memory store หายเมื่อ dev server compile route ใหม่</span><span class="why">แก้: เก็บบน globalThis</span><span class="where"><code>memory-repository.ts</code>, <code>event-store.ts</code></span></div>
+      <div class="finding"><span class="chip warn">medium</span><span class="what">นักเรียนเห็นแผง “Backend Telemetry & Logs” และค่าปลอม (ornith:9b, Temp 0.2, localhost:11434)</span><span class="why">แก้: ซ่อนหลัง <code>?debug=1</code> และเอาชื่อโมเดลที่ hardcode ออก</span><span class="where"><code>diagnostic-terminal-drawer.tsx</code>, <code>ai-evaluating-indicator.tsx</code></span></div>
+      <div class="finding"><span class="chip warn">medium</span><span class="what">iPhone ซูมหน้าเองตอนแตะช่องพิมพ์ · ปุ่มเล็กกว่า 44 px · stepper สูง 4 แถว</span><span class="why">แก้: ฟอนต์ช่องกรอก 16 px บนจอสัมผัส · ปุ่ม 44 px · stepper เลื่อนแนวนอนและจัดขั้นปัจจุบันให้อยู่กลาง · รองรับ notch</span><span class="where"><code>globals.css</code>, <code>layout.tsx</code>, <code>adi-stepper.tsx</code></span></div>
+      <div class="finding"><span class="chip warn">medium</span><span class="what">หน้า /demo ไม่มี CSS เลย</span><span class="why">class <code>demo-gate-*</code> ไม่เคยถูกเขียน · แก้: เพิ่มสไตล์ ใช้ร่วมกับหน้า unlock ครู</span><span class="where"><code>globals.css</code></span></div>
+      <div class="finding"><span class="chip neutral">low</span><span class="what">error ภาษาอังกฤษถึงนักเรียน · stepper ไม่มี focus ring</span><span class="why">แก้: <code>studentFriendlyError</code> และ focus-visible</span><span class="where"><code>lib/ui/student-errors.ts</code></span></div>
+      <div class="finding"><span class="chip neutral">tooling</span><span class="what">preview ค้างเมื่อเรียก Next ผ่าน <code>npx</code> บน Windows</span><span class="why">แก้: launch.json เรียก <code>node node_modules/next/dist/bin/next</code></span><span class="where"><code>.claude/launch.json</code></span></div>
+    </div>
+    <h3>ยังเปิดอยู่</h3>
+    <div class="list-card">
+      <div class="finding"><span class="chip crit">high</span><span class="what">Phase 5–7 ไม่โหลดสถานะ “ส่งแล้ว” กลับมาหลังรีเฟรช</span><span class="why">นักเรียนอาจส่ง peer review / revision / reflection ซ้ำ · ควรอ่านจาก <code>/api/progress</code> หรือ GET ของแต่ละ route</span></div>
+      <div class="finding"><span class="chip warn">medium</span><span class="what">ปลดล็อก Draft 1 แล้ว Freeze ใหม่ ส่ง <code>draft1Frozen: true</code> ซ้ำ</span><span class="why">ต้องยืนยันว่าเซิร์ฟเวอร์ไม่เขียนทับ baseline (DB มี trigger, memory mode ต้องเช็ก)</span></div>
+      <div class="finding"><span class="chip warn">medium</span><span class="what">ข้อความ Phase 5 (คำถามเรื่องพลังงานหมุนเวียน) และ checklist Phase 7 hardcode เรื่องระบบนิเวศ</span><span class="why">กิจกรรม cycle 2 จะได้ตัวช่วยที่ไม่ตรงเรื่อง ควรย้ายไปไว้ใน content pack</span></div>
+      <div class="finding"><span class="chip warn">medium</span><span class="what">ค่าเริ่มต้นระดับ hint คือ “Deep” (−3 คะแนน)</span><span class="why">เป็นการตัดสินใจเชิงวิจัย ควรให้ครูยืนยัน ค่าเริ่มต้นมีผลต่อพฤติกรรม</span></div>
+      <div class="finding"><span class="chip neutral">low</span><span class="what">สีแบบ inline จำนวนมากใน phase 4/6 และ teacher dashboard ทำให้ dark mode และ contrast คุมไม่ได้</span><span class="why">ย้ายเป็น CSS token</span></div>
+      <div class="finding"><span class="chip neutral">low</span><span class="what">Node 24.15 บนเครื่อง แต่ <code>engines</code> ต้องการ ^24.22.1</span><span class="why">อัปเดต Node ก่อน pilot</span></div>
+      <div class="finding"><span class="chip neutral">ยังไม่ได้ทำ</span><span class="what">ยังไม่ได้ทดสอบหน้าครูแบบลงลึก และ Phase 5–7 ยังไม่ได้ทดสอบจนจบ</span><span class="why">ตรวจแค่ gate, layout บน iPad และ API roster</span></div>
+    </div>
+  </section>
+
+  <section id="research">
+    <div class="sec-head">
+      <span class="eyebrow">โปรเจกต์อ้างอิง</span>
+      <h2>ดูระบบอื่นแล้วยืมอะไรมา</h2>
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <h3>WISE (UC Berkeley, open source GPL-3)</h3>
+        <p>แพลตฟอร์มสืบเสาะวิทยาศาสตร์ระดับมัธยม ทำทีละ step ต่อหน้าจอ บันทึกอัตโนมัติ และครูสร้างกิจกรรมเองได้</p>
+        <p class="cap">ยืมมา: ทีละขั้น + autosave (ทำแล้ว) · ต่อไป: ครูแก้ content pack เองโดยไม่ต้องแก้โค้ด</p>
+      </div>
+      <div class="panel">
+        <h3>Khanmigo (Khan Academy)</h3>
+        <p>บทเรียนที่สาธารณะพูดถึง: prompt ยาวทำให้โมเดลข้ามคำสั่ง และ chat แบบ Socratic ล้วน ๆ ทำให้เด็กที่ติดอยู่หงุดหงิด ทีมอยากไปให้ไกลกว่า chat</p>
+        <p class="cap">ยืมมา: ตัวช่วยเริ่มประโยค (ทำแล้ว) · ต่อไป: บันไดความช่วยเหลือเมื่อติด แทนการถามกลับซ้ำ ๆ</p>
+      </div>
+      <div class="panel">
+        <h3>CER scaffolds (NSTA, ห้องเรียน iSTEM)</h3>
+        <p>ใช้ sentence starters, word bank และเชื่อม evidence กลับไปที่คำถามหลัก ปัญหาที่พบบ่อยคือนักเรียนแยก evidence กับ reasoning ไม่ออก</p>
+        <p class="cap">ยืมมา: starters แยก Claim / Evidence / Reasoning · ต่อไป: เลือก evidence จากตาราง Phase 3 ด้วยการแตะ</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="brainstorm">
+    <div class="sec-head">
+      <span class="eyebrow">Product brainstorming</span>
+      <h2>คิดก่อนสร้าง</h2>
+    </div>
+    <div class="callout">
+      <span class="eyebrow">Job to be done</span>
+      <p class="quote">เมื่อฉันติดอยู่ตอนเขียนข้อโต้แย้งในคาบเรียน ฉันอยากได้แรงผลักเล็ก ๆ ที่ยังทำให้งานเป็นของฉัน เพื่อจะเขียนเสร็จทันคาบ</p>
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <h3>How might we</h3>
+        <ul>
+          <li>ช่วยนักเรียนที่ติด ให้ไปต่อได้ภายใน 1 นาที โดย AI ไม่เขียนแทน</li>
+          <li>ให้ครูรู้ว่าใครติดตอนไหน ระหว่างคาบ ไม่ใช่หลังเลิกเรียน</li>
+          <li>ให้ผู้ปกครองเห็นพัฒนาการ โดยไม่เปิดเผยงานของเด็กคนอื่น</li>
+          <li>ให้ AI บนเครื่องเดียวรับนักเรียน 30 คนพร้อมกันได้</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>สมมติฐานที่เสี่ยงที่สุด</h3>
+        <ul>
+          <li><b>เครื่องเดียวพอสำหรับทั้งห้อง</b> ทดสอบแล้ว: 20 คนพร้อมกันบน RTX 4050 ด้วย LM Studio คนกลางรอ 9.8 วินาที ช้าสุด 19 วินาที ใช้ได้ แต่ควรแสดงลำดับคิวให้นักเรียนเห็น</li>
+          <li><b>ผู้ปกครองอยากได้รายงานทาง LINE</b> ทดสอบด้วยการส่งสรุปทำมือให้ผู้ปกครอง 5 คนก่อนเขียนโค้ด</li>
+          <li><b>นักเรียนอ่านคำถามนำแล้วเขียนต่อได้จริง</b> วัดจาก revision v2 ต่าง v1 แค่ไหน</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>ข้อโต้แย้งที่แรงที่สุด</h3>
+        <p>การแจ้งเตือนผู้ปกครองทุกวันอาจกลายเป็นแรงกดดันให้เด็กใช้ AI เพื่อให้ “ดูดี” แทนการคิดเอง และทำให้ข้อมูลวิจัยเอนเอียง ควรส่งเป็นรายสัปดาห์ เน้นพัฒนาการ ไม่ใช่คะแนน และให้ครูเห็นก่อนส่ง</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ทางเลือกโฮสต์ LLM</th><th>ข้อดี</th><th>ข้อเสีย</th><th>ความเห็น</th></tr></thead>
+        <tbody>
+          <tr><td>A. เครื่องครู + Ollama/LM Studio ผ่าน LAN</td><td>ฟรี ข้อมูลไม่ออกนอกห้อง</td><td>คิวยาวเมื่อส่งพร้อมกัน เครื่องปิดคือระบบล่ม</td><td>เหมาะกับ pilot 1 ห้อง</td></tr>
+          <tr><td>B. Mini-PC/GPU ของโรงเรียน</td><td>เสถียร รับหลายห้อง</td><td>ต้องมีคนดูแล</td><td>เป้าหมายหลัง pilot</td></tr>
+          <tr><td>C. Cloud API (DeepSeek ฯลฯ)</td><td>เร็ว รับโหลดได้</td><td>ข้อมูลเด็กออกนอกโรงเรียน ต้องขอ consent เพิ่ม</td><td>ใช้เป็น fallback เท่านั้น</td></tr>
+          <tr><td><b>D. Hybrid: local หลัก + คิว + cloud fallback ที่มี consent</b></td><td>เร็วและปลอดภัยเกือบทุกกรณี</td><td>ซับซ้อนขึ้น</td><td><span class="chip ok">แนะนำ</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="future">
+    <div class="sec-head">
+      <span class="eyebrow">Soon-to-be</span>
+      <h2>สถาปัตยกรรมเป้าหมาย</h2>
+      <p>เพิ่ม 3 ชิ้น: LLM gateway ที่มีคิว, outbox สำหรับการแจ้งเตือน, และ LINE OA เป็นช่องทางส่งรายงาน โดยยังเป็น Next.js ตัวเดียวและ Supabase ตัวเดียว</p>
+    </div>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  subgraph People["ผู้ใช้"]
+    ST["นักเรียน\niPhone/iPad"]
+    TE["ครู\niPad + LINE"]
+    PA["ผู้ปกครอง\nLINE"]
+  end
+  subgraph App["Next.js"]
+    UI["หน้าเว็บ PWA\nresponsive"]
+    API2["/api/*"]
+    GW["LLM gateway\nคิว · concurrency · timeout\nfallback routing"]
+    WH["/api/line/webhook\nตรวจ X-Line-Signature"]
+    LINK["/api/line/link\nLINE Login account link"]
+    JOB["Report jobs\ncron รายวัน/รายสัปดาห์"]
+  end
+  subgraph DB["Supabase"]
+    CORE[("21 tables เดิม")]
+    LA[("line_accounts")]
+    NP[("notification_preferences")]
+    OB[("notification_outbox")]
+    RS[("report_snapshots")]
+  end
+  subgraph Ext["ภายนอก"]
+    LOC["Ollama / LM Studio\nqwen3.5 4B"]
+    CLOUD["Cloud LLM\nconsent เท่านั้น"]
+    LINEAPI["LINE Messaging API\npush · Flex Message"]
+  end
+  ST --> UI --> API2
+  TE --> UI
+  API2 --> GW --> LOC
+  GW -.-> CLOUD
+  API2 --> CORE
+  JOB --> CORE
+  JOB --> RS --> OB
+  OB -->|worker ส่งซ้ำได้| LINEAPI
+  LINEAPI --> TE
+  LINEAPI --> PA
+  LINEAPI --> ST
+  TE -->|follow OA| WH
+  PA -->|follow OA| WH
+  WH --> LA
+  LINK --> LA
+  NP --> JOB
+</pre>
+    </div>
+  </section>
+
+  <section id="line">
+    <div class="sec-head">
+      <span class="eyebrow">LINE Official Account · Messaging API</span>
+      <h2>รายงานถึงครู ผู้ปกครอง และนักเรียนผ่าน LINE</h2>
+      <p>ในไทยทุกคนมี LINE อยู่แล้ว จึงเป็นช่องทางที่ไม่ต้องติดตั้งอะไรเพิ่ม แต่ข้อมูลเป็นของผู้เยาว์ ต้องคุมตาม PDPA ตั้งแต่ออกแบบ</p>
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <span class="chip info">ครู</span>
+        <h3>สรุประหว่างคาบและท้ายวัน</h3>
+        <ul>
+          <li>ระหว่างคาบ: “3 คนยังไม่ Freeze Draft 1 หลัง 20 นาที”</li>
+          <li>ท้ายวัน: งานรอตรวจ, ใครใช้ hint ระดับ deep บ่อย, ใครส่ง v2 แล้ว</li>
+          <li>ปุ่มใน Flex Message เปิด <code>/teacher/review</code> (ยังต้องใส่รหัสครู)</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <span class="chip ok">ผู้ปกครอง</span>
+        <h3>รายสัปดาห์ เน้นพัฒนาการ</h3>
+        <ul>
+          <li>ทำครบกี่ขั้น, ปรับปรุงงานจาก feedback ไหม, คำถามชวนคุยที่บ้าน 1 ข้อ</li>
+          <li>ไม่มีคะแนนดิบ ไม่มีข้อความงานของเด็ก ไม่มีข้อมูลเพื่อน</li>
+          <li>ส่งได้เฉพาะเมื่อมี consent ผู้ปกครองใน <code>consent_records</code></li>
+          <li>ครูกดอนุมัติก่อนส่งในช่วง pilot</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <span class="chip warn">นักเรียน</span>
+        <h3>เตือนและบอกว่ามีเรื่องรอ</h3>
+        <ul>
+          <li>“เพื่อนให้ feedback งานของคุณแล้ว กลับไปทำ Phase 6 ได้”</li>
+          <li>“ครูตรวจงานแล้ว” พร้อมลิงก์กลับเข้า Learning OS</li>
+          <li>ห้ามส่งเนื้อหางานหรือคำถาม AI ผ่าน LINE ให้คิดในแอปเท่านั้น</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant P as ผู้ปกครอง
+  participant L as LINE OA
+  participant W as /api/line/webhook
+  participant K as /api/line/link
+  participant D as Supabase
+  participant J as Report job
+  participant M as LINE Messaging API
+  P->>L: แอดเพื่อน OA (สแกน QR จากครู)
+  L->>W: follow event + userId
+  W->>W: ตรวจ X-Line-Signature (HMAC-SHA256 ด้วย channel secret)
+  W-->>P: ส่งลิงก์ผูกบัญชีแบบใช้ครั้งเดียว
+  P->>K: เปิดลิงก์ + รหัสผูกบัญชีที่ครูให้
+  K->>D: line_accounts(profile, role parent, student_ref) + consent
+  Note over J: ทุกวันศุกร์ 17:00
+  J->>D: สร้าง report_snapshots + notification_outbox
+  J->>M: push Flex Message (Channel access token)
+  M-->>P: รายงานรายสัปดาห์
+  J->>D: mark sent / retry เมื่อ 429/5xx
+</pre>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ตารางใหม่</th><th>คอลัมน์หลัก</th><th>RLS</th></tr></thead>
+        <tbody>
+          <tr><td><code>line_accounts</code></td><td>id, profile_id, line_user_id (unique), role (teacher/parent/student), student_profile_id (สำหรับผู้ปกครอง), linked_at, unlinked_at</td><td>เจ้าของอ่านของตัวเอง · ครูเห็นสถานะผูกบัญชีในห้องของตน · ไม่มี client write</td></tr>
+          <tr><td><code>line_link_tokens</code></td><td>token_hash, student_profile_id, role, expires_at, used_at</td><td>service role เท่านั้น · หมดอายุ 24 ชม. ใช้ได้ครั้งเดียว</td></tr>
+          <tr><td><code>notification_preferences</code></td><td>line_account_id, kind (daily_teacher, weekly_parent, student_nudge), enabled, quiet_hours</td><td>เจ้าของแก้ของตัวเอง</td></tr>
+          <tr><td><code>report_snapshots</code></td><td>id, kind, class_id, student_profile_id, period, payload jsonb (สรุปแล้ว ไม่มีข้อความดิบ)</td><td>ครูของห้อง · ผู้ปกครองที่ผูก + consent</td></tr>
+          <tr><td><code>notification_outbox</code></td><td>id, line_account_id, snapshot_id, status, attempts, next_attempt_at, line_request_id, error</td><td>service role เท่านั้น</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h3>ตัวอย่างข้อความผู้ปกครอง</h3>
+        <div class="msg">
+          <b>Learning OS · รายงานสัปดาห์นี้</b>
+          <span>น้องทำกิจกรรม “สายใยอาหาร” ครบ 7 ขั้น และปรับปรุงข้อโต้แย้งหลังได้ feedback จากเพื่อน 2 ข้อ</span>
+          <span>ชวนคุยที่บ้าน: “ถ้างูในทุ่งนาหายไป จะเกิดอะไรกับข้าว?”</span>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>ความปลอดภัยและกติกา</h3>
+        <ul>
+          <li>Channel secret และ access token อยู่ใน env ฝั่งเซิร์ฟเวอร์เท่านั้น</li>
+          <li>ทุก webhook ตรวจลายเซ็นก่อนอ่าน body · ตอบ 200 เร็ว แล้วทำงานต่อใน outbox</li>
+          <li>ใช้ <code>X-Line-Retry-Key</code> กันส่งซ้ำ</li>
+          <li>ยกเลิกผูกบัญชีได้ทันทีจากทั้ง LINE และหน้าเว็บ</li>
+          <li>โควตาข้อความฟรีของ OA มีจำกัดต่อเดือน ตรวจแพ็กเกจปัจจุบันของ LINE ประเทศไทยก่อนเปิดกับผู้ปกครองทั้งห้อง และรวมข้อความเป็นรายสัปดาห์เพื่อประหยัด</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout line">
+      <span class="eyebrow">ขั้นตอนเริ่มต้นที่ถูกที่สุด</span>
+      <p>สร้าง OA และ Messaging API channel → ทำ webhook ที่ตรวจลายเซ็น + ผูกบัญชีครู 1 คน → ส่งสรุปรายวันให้ครูคนเดียว 1 สัปดาห์ → ถ้าครูใช้จริง ค่อยเปิดฝั่งผู้ปกครองพร้อม consent</p>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="sec-head">
+      <span class="eyebrow">Plan</span>
+      <h2>Roadmap</h2>
+    </div>
+    <div class="phase-row">
+      <div class="phase">
+        <span class="when">Now · ก่อน pilot</span>
+        <h3>ให้ห้องเรียนจริงใช้ได้</h3>
+        <ol>
+          <li>Commit งานวันนี้ แล้วทดสอบ Phase 5–7 จนจบ</li>
+          <li>โหลดสถานะ “ส่งแล้ว” ของ Phase 5–7 กลับมาหลังรีเฟรช</li>
+          <li>แสดงลำดับคิว AI ให้นักเรียนเห็น (30 คนพร้อมกัน คนสุดท้ายรอ ~30 วินาที)</li>
+          <li>รัน coach evaluation กับ Qwen 3.5 4B</li>
+          <li>Playwright E2E บน iPhone/iPad viewport (LOS-019)</li>
+        </ol>
+      </div>
+      <div class="phase">
+        <span class="when">Next · ระหว่าง pilot</span>
+        <h3>ครูเห็นปัญหาระหว่างคาบ</h3>
+        <ol>
+          <li>LLM gateway: คิว + แสดงลำดับคิวให้นักเรียน</li>
+          <li>บันไดความช่วยเหลือเมื่อติด และเลือก evidence ด้วยการแตะ</li>
+          <li>ย้าย prompt ตัวช่วย Phase 5/7 เข้า content pack</li>
+          <li>LINE OA ฝั่งครู: webhook, ผูกบัญชี, สรุปรายวัน</li>
+          <li>PWA: เพิ่มลงหน้าจอ iPad ได้</li>
+        </ol>
+      </div>
+      <div class="phase">
+        <span class="when">Later · ขยายผล</span>
+        <h3>ผู้ปกครองและหลายห้อง</h3>
+        <ol>
+          <li>LINE รายงานผู้ปกครองรายสัปดาห์ (consent + ครูอนุมัติ)</li>
+          <li>LINE แจ้งนักเรียนเมื่อมี feedback รอ</li>
+          <li>ครูแก้ content pack เองแบบ WISE</li>
+          <li>เซิร์ฟเวอร์ LLM ของโรงเรียน + cloud fallback ที่มี consent</li>
+          <li>เก็บกวาดตาราง <code>profiles</code> รุ่นแรก</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>สร้างจากการเปิดเว็บจริง (localhost:3100, memory mode), อ่านโค้ด, migrations 001–013 และทดสอบ Ollama 0.33.3 กับ LM Studio บนเครื่องนี้ วันที่ 28 ต.ค. 2026</span>
+    <span>แหล่งอ้างอิง</span>
+    <ul>
+      <li><a href="https://github.com/WISE-Community/WISE-DEPRECATED/wiki">WISE-Community wiki (GitHub)</a> · <a href="https://en.wikipedia.org/wiki/Web-based_Inquiry_Science_Environment">Web-based Inquiry Science Environment</a></li>
+      <li><a href="https://ai.engineer/talks/scaling-ai-in-education-a-khanmigo-case-study">Scaling AI in Education: a Khanmigo case study</a> · <a href="https://rickhess99.medium.com/can-an-ai-powered-tutor-produce-meaningful-results-b67d7376cb51">Can an AI-powered tutor produce meaningful results?</a> · <a href="https://dev.to/max_quimby/khanmigo-was-a-non-event-whats-next-for-ai-tutors-376k">Khanmigo was a non-event (ความเห็น)</a></li>
+      <li><a href="https://www.nsta.org/sites/default/files/journal-articles/S%2BC_JulyAug_2022/fleming_table_1.pdf">NSTA CER sentence starters</a> · <a href="https://cubeforteachers.com/post/Using-Interactive-Claim-Evidence-Reasoning-Examples-with-Structured-Language-Support-to-teach-CER-Adventures-in-ISTEM-nq8txg8dko0qk85f">CER language support (Adventures in iSTEM)</a></li>
+    </ul>
+  </footer>
+</div>

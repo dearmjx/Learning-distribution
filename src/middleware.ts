@@ -6,6 +6,12 @@ import {
   isDemoModeEnabled,
   verifyDemoSessionToken,
 } from "@/lib/demo-mode";
+import {
+  TEACHER_COOKIE_NAME,
+  isTeacherGateEnabled,
+  isTeacherPath,
+  verifyTeacherSessionToken,
+} from "@/lib/teacher-gate";
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
@@ -31,9 +37,27 @@ export async function middleware(request: NextRequest) {
     await supabase.auth.getUser();
   }
 
-  if (!isDemoModeEnabled()) return response;
-
   const { pathname } = request.nextUrl;
+
+  // Teacher tools sit behind their own password, independent of demo mode.
+  if (isTeacherGateEnabled() && isTeacherPath(pathname)) {
+    const teacherToken = request.cookies.get(TEACHER_COOKIE_NAME)?.value;
+    if (!(await verifyTeacherSessionToken(teacherToken))) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { error: "ต้องใส่รหัสแดชบอร์ดครูก่อน" },
+          { status: 401, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      const unlockUrl = request.nextUrl.clone();
+      unlockUrl.pathname = "/teacher/unlock";
+      unlockUrl.search = "";
+      unlockUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+      return NextResponse.redirect(unlockUrl);
+    }
+  }
+
+  if (!isDemoModeEnabled()) return response;
   const isPublicPath =
     pathname === "/demo" ||
     pathname.startsWith("/api/demo/") ||

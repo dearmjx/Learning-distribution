@@ -204,6 +204,8 @@ export async function POST(request: Request) {
         submissionId: submission.id,
         targetDimension: feedback.targetDimension,
         provider: feedback.provider,
+        promptVersion: feedback.promptVersion,
+        contentVersion: activity.contentVersion ?? "unversioned",
         fallbackUsed: feedback.fallbackUsed,
         ragChunkIds: approvedContext.chunkIds,
         citations: feedback.citations,

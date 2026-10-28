@@ -1,4 +1,4 @@
-import { ecosystemKnowledgeChunks } from "@/data/course/ecosystem/knowledge-base";
+import { ecosystemContentPack } from "@/data/course/ecosystem/content-pack";
 import type { KnowledgeChunk } from "@/lib/knowledge/types";
 
 /**
@@ -9,5 +9,8 @@ import type { KnowledgeChunk } from "@/lib/knowledge/types";
  * scope before scoring anything.
  */
 export const approvedKnowledgeChunks: KnowledgeChunk[] = [
-  ...ecosystemKnowledgeChunks,
+  ...ecosystemContentPack.knowledgeChunks.map((chunk) => ({
+    ...chunk,
+    contentVersion: ecosystemContentPack.version,
+  })),
 ];

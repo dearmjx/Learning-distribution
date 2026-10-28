@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Activity, PeerReviewSubmission } from "@/lib/domain/types";
+import { studentFriendlyError } from "@/lib/ui/student-errors";
 
 interface Phase5Props {
   activity: Activity;
@@ -10,7 +11,7 @@ interface Phase5Props {
   onBack: () => void;
 }
 
-export function Phase5PeerReview({ activity, studentId = "demo-student-01", onNext, onBack }: Phase5Props) {
+export function Phase5PeerReview({ activity, onNext, onBack }: Phase5Props) {
   const [peerDraft, setPeerDraft] = useState<PeerReviewSubmission | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -64,9 +65,8 @@ export function Phase5PeerReview({ activity, studentId = "demo-student-01", onNe
       const response = await fetch("/api/peer-reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // The reviewer is the signed-in student; the server resolves it.
         body: JSON.stringify({
-          studentId,
-          reviewerStudentId: studentId,
           submissionId: peerDraft.submissionId,
           peerReviewSubmissionId: peerDraft.id,
           authorStudentId: peerDraft.authorStudentId,
@@ -85,7 +85,7 @@ export function Phase5PeerReview({ activity, studentId = "demo-student-01", onNe
       if (!response.ok) throw new Error(data.error ?? "บันทึกการประเมินไม่สำเร็จ");
       setSubmittedReview(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการส่งการประเมิน");
+      setError(studentFriendlyError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการส่งการประเมิน"));
     } finally {
       setSubmitting(false);
     }

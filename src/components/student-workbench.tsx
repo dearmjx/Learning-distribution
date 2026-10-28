@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { Activity, CerResponse, CoachFeedback, Submission } from "@/lib/domain/types";
-import { AdiStepper } from "@/components/adi-stepper";
+import type { Activity, AdiPhase, AdiWizardState, CerResponse, CoachFeedback, Submission } from "@/lib/domain/types";
+import { ADI_PHASES, AdiStepper } from "@/components/adi-stepper";
 import { Phase1Orientation } from "@/components/phases/phase1-orientation";
 import { Phase2Identification } from "@/components/phases/phase2-identification";
 import { Phase3Investigation } from "@/components/phases/phase3-investigation";
@@ -12,8 +12,14 @@ import { Phase5PeerReview } from "@/components/phases/phase5-peer-review";
 import { Phase6Revision } from "@/components/phases/phase6-revision";
 import { Phase7Reflection } from "@/components/phases/phase7-reflection";
 import { DiagnosticTerminalDrawer } from "@/components/diagnostic-terminal-drawer";
+import { studentFriendlyError } from "@/lib/ui/student-errors";
 
 const emptyCer: CerResponse = { claim: "", evidence: "", reasoning: "" };
+const phaseKeys = ADI_PHASES.map((phase) => phase.key) as AdiPhase[];
+
+function phaseStep(phase: AdiPhase): number {
+  return Math.max(1, phaseKeys.indexOf(phase) + 1);
+}
 
 interface StudentWorkbenchProps {
   initialActivityId?: string;
@@ -24,15 +30,13 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [activityId, setActivityId] = useState("");
   const [persistenceMode, setPersistenceMode] = useState<"memory" | "supabase">("memory");
-  const [classId, setClassId] = useState("biology-m4-class-a");
-  const [studentId, setStudentId] = useState("40101");
+  // Identity always comes from the server session; a client-side picker cannot change who the API records.
+  const [studentId, setStudentId] = useState("");
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([1]);
-
-  // Generate 57 student IDs for the 2 classrooms (memory/demo mode only)
-  const classAStudents = useMemo(() => Array.from({ length: 29 }, (_, i) => `401${String(i + 1).padStart(2, "0")}`), []);
-  const classBStudents = useMemo(() => Array.from({ length: 28 }, (_, i) => `402${String(i + 1).padStart(2, "0")}`), []);
-  const activeStudentList = useMemo(() => classId === "biology-m4-class-b" ? classBStudents : classAStudents, [classId, classAStudents, classBStudents]);
+  const [hydratedActivityId, setHydratedActivityId] = useState("");
+  const [progressStatus, setProgressStatus] = useState<"loading" | "saved" | "saving" | "error">("loading");
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   // State across phases
   const [variablesData, setVariablesData] = useState<Record<string, string>>({});
@@ -41,42 +45,10 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
   const [, setRevisedSubmission] = useState<Submission | null>(null);
   const [error, setError] = useState("");
 
-  // Load saved student ID and classroom from localStorage in memory/demo mode only
+  // The LLM telemetry console is for the researcher, not for students: opt in with ?debug=1.
   useEffect(() => {
-    if (persistenceMode === "supabase") return;
-    try {
-      const savedClass = localStorage.getItem("learning_os_class_id");
-      if (savedClass) setClassId(savedClass);
-      const savedStudent = localStorage.getItem("learning_os_student_id");
-      if (savedStudent) setStudentId(savedStudent);
-    } catch {
-      // ignore
-    }
-  }, [persistenceMode]);
-
-  function handleClassIdChange(val: string) {
-    if (persistenceMode === "supabase") return;
-    setClassId(val);
-    const defaultStudent = val === "biology-m4-class-b" ? "40201" : "40101";
-    setStudentId(defaultStudent);
-    try {
-      localStorage.setItem("learning_os_class_id", val);
-      localStorage.setItem("learning_os_student_id", defaultStudent);
-    } catch {
-      // ignore
-    }
-  }
-
-  function handleStudentIdChange(val: string) {
-    if (persistenceMode === "supabase") return;
-    const cleaned = val.trim() || "40101";
-    setStudentId(val);
-    try {
-      localStorage.setItem("learning_os_student_id", cleaned);
-    } catch {
-      // ignore
-    }
-  }
+    setShowDiagnostics(new URLSearchParams(window.location.search).get("debug") === "1");
+  }, []);
 
   useEffect(() => {
     void fetch("/api/activities")
@@ -95,19 +67,104 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
         setActivities(data.activities);
         const selected = data.activities.find((item) => item.id === initialActivityId)?.id ?? data.activities[0]?.id ?? "";
         setActivityId(selected);
-        if (data.persistence === "supabase") {
-          setPersistenceMode("supabase");
-          if (data.session?.classId) setClassId(data.session.classId);
-          if (data.session?.studentId) setStudentId(data.session.studentId);
-        } else {
-          setPersistenceMode("memory");
-        }
+        setPersistenceMode(data.persistence === "supabase" ? "supabase" : "memory");
+        if (data.session?.studentId) setStudentId(data.session.studentId);
       })
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "โหลดกิจกรรมไม่สำเร็จ"))
       .finally(() => setActivitiesLoading(false));
   }, [initialActivityId]);
 
   const activity = useMemo(() => activities.find((item) => item.id === activityId), [activities, activityId]);
+
+  useEffect(() => {
+    if (!activityId || activitiesLoading) return;
+    let cancelled = false;
+    setHydratedActivityId("");
+    setProgressStatus("loading");
+    setCurrentStep(1);
+    setCompletedSteps([1]);
+    setVariablesData({});
+    setCer(emptyCer);
+    setCerResult(null);
+
+    void fetch(`/api/progress?activityId=${encodeURIComponent(activityId)}`, { cache: "no-store" })
+      .then(async (response) => {
+        const data = (await response.json()) as {
+          state?: AdiWizardState | null;
+          submission?: Submission | null;
+          feedback?: CoachFeedback | null;
+          error?: string;
+        };
+        if (!response.ok) throw new Error(data.error ?? "โหลดความคืบหน้าไม่สำเร็จ");
+        if (cancelled) return;
+        if (data.state) {
+          setCurrentStep(phaseStep(data.state.currentPhase));
+          setCompletedSteps(data.state.completedPhases.map(phaseStep));
+          setVariablesData({
+            independent: data.state.investigationData?.variables?.independent ?? "",
+            dependent: data.state.investigationData?.variables?.dependent ?? "",
+            controlled: data.state.investigationData?.variables?.controlled?.join(", ") ?? "",
+            hypothesis: data.state.investigationData?.notes ?? "",
+          });
+          setCer(data.state.draftCer ?? emptyCer);
+        }
+        if (data.submission && data.feedback) setCerResult({ submission: data.submission, feedback: data.feedback });
+        setHydratedActivityId(activityId);
+        setProgressStatus("saved");
+        setError("");
+      })
+      .catch((reason: unknown) => {
+        if (cancelled) return;
+        setProgressStatus("error");
+        setError(reason instanceof Error ? reason.message : "โหลดความคืบหน้าไม่สำเร็จ");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activityId, activitiesLoading]);
+
+  useEffect(() => {
+    if (!activityId || hydratedActivityId !== activityId || activitiesLoading) return;
+    const timeout = window.setTimeout(() => {
+      const currentPhase = phaseKeys[currentStep - 1] ?? "orientation";
+      const state: AdiWizardState = {
+        currentPhase,
+        completedPhases: Array.from(new Set(completedSteps.map((step) => phaseKeys[step - 1]).filter((phase): phase is AdiPhase => Boolean(phase)))),
+        investigationData: {
+          variables: {
+            independent: variablesData.independent ?? "",
+            dependent: variablesData.dependent ?? "",
+            controlled: variablesData.controlled ? [variablesData.controlled] : [],
+          },
+          notes: variablesData.hypothesis ?? "",
+        },
+        draftCer: cer,
+        activeSubmissionId: cerResult?.submission.id,
+      };
+
+      setProgressStatus("saving");
+      void fetch("/api/progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({ activityId, saveId: crypto.randomUUID(), state }),
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            const data = (await response.json()) as { error?: string };
+            throw new Error(data.error ?? "บันทึกความคืบหน้าไม่สำเร็จ");
+          }
+          setProgressStatus("saved");
+          setError("");
+        })
+        .catch((reason: unknown) => {
+          setProgressStatus("error");
+          setError(reason instanceof Error ? reason.message : "บันทึกความคืบหน้าไม่สำเร็จ");
+        });
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [activityId, activitiesLoading, cer, cerResult, completedSteps, currentStep, hydratedActivityId, variablesData]);
 
   function advanceToStep(step: number) {
     setCurrentStep(step);
@@ -140,58 +197,24 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
         <div className="hero-brand">
           <div className="brand-badge">
             <span className="brand-dot" />
-            <span>LEARNING OS · CAR RESEARCH ENVIRONMENT (ม.4)</span>
+            <span>ชีววิทยา ม.4 · ระบบนิเวศ</span>
           </div>
-          <h1>7-Phase ADI Inquiry Hub</h1>
+          <h1>ห้องสืบเสาะวิทยาศาสตร์</h1>
           <p className="lede">
-            ระบบสืบเสาะทางวิทยาศาสตร์แบบ Argument-Driven Inquiry (ADI) 7 ขั้นตอน พร้อม AI Socratic Coach
+            ทำทีละขั้น 7 ขั้น: สังเกต → ตั้งสมมติฐาน → ดูข้อมูล → เขียนข้อโต้แย้ง → ประเมินเพื่อน → ปรับปรุง → สะท้อนคิด
           </p>
         </div>
 
         <div className="hero-actions">
-          {persistenceMode !== "supabase" && (
-            <>
-              {/* Classroom Selector */}
-              <div className="student-id-selector-box">
-                <label htmlFor="class-select">🏫 ห้องเรียน:</label>
-                <select
-                  id="class-select"
-                  className="form-select"
-                  value={classId}
-                  onChange={(e) => handleClassIdChange(e.target.value)}
-                >
-                  <option value="biology-m4-class-a">ม.4/1 (29 คน)</option>
-                  <option value="biology-m4-class-b">ม.4/2 (28 คน)</option>
-                </select>
-              </div>
-
-              {/* Student ID Roster Selector & Input */}
-              <div className="student-id-selector-box">
-                <label htmlFor="student-id-select">🧑‍🎓 รหัสนักเรียน:</label>
-                <select
-                  id="student-id-select"
-                  className="form-select"
-                  value={studentId}
-                  onChange={(e) => handleStudentIdChange(e.target.value)}
-                >
-                  {activeStudentList.map((sid, idx) => (
-                    <option key={sid} value={sid}>
-                      เลขที่ {idx + 1} ({sid})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
-
           <div className="activity-selector-box">
-            <label htmlFor="activity-select">เลือกกิจกรรม (PAOR Cycle):</label>
+            <label htmlFor="activity-select">กิจกรรม:</label>
             <select
               id="activity-select"
               className="activity-dropdown"
               value={activityId}
               onChange={(e) => {
                 setActivityId(e.target.value);
+                setHydratedActivityId("");
                 setCurrentStep(1);
                 setCompletedSteps([1]);
                 setCer(emptyCer);
@@ -216,29 +239,39 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
             >
               🔄 เริ่มใหม่
             </button>
-            <Link
-              className="pill-link"
-              href={persistenceMode === "supabase" ? "/student/timeline" : `/student/timeline?studentId=${encodeURIComponent(studentId)}`}
-            >
-              📜 Timeline
+            <Link className="pill-link" href="/student/timeline">
+              📜 งานของฉัน
             </Link>
-            <Link className="pill-link" href="/teacher/review">
-              👩‍🏫 แดชบอร์ดครู
-            </Link>
+            {/* Students in a real class never see teacher tools; the demo keeps the shortcut. */}
+            {persistenceMode !== "supabase" && (
+              <Link className="pill-link" href="/teacher/review">
+                👩‍🏫 แดชบอร์ดครู (สาธิต)
+              </Link>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Modern Notice Banner */}
       <div className="notice-strip">
-        <div className="notice-pill">🔬 PAOR {activity?.cycle ? `Cycle ${activity.cycle}` : "Cycle 1"} · ADI</div>
+        <div className="notice-pill">🔬 รอบที่ {activity?.cycle ?? 1}</div>
         <p>
-          เรียนรู้ผ่าน 7 ขั้นตอน: ปรากฏการณ์ ➔ ตัวแปร ➔ ข้อมูลสืบเสาะ ➔ ร่าง CER ➔ ประเมินเพื่อน ➔ ปรับปรุงข้อโต้แย้ง ➔ สะท้อนคิด
+          ขั้นที่ {currentStep} จาก 7 · {ADI_PHASES[currentStep - 1]?.thaiName.replace(/^\d+\.\s*/, "")}
         </p>
-        <span className="active-student-tag">
-          ห้อง {persistenceMode === "supabase" ? classId : classId === "biology-m4-class-b" ? "ม.4/2" : "ม.4/1"} · ผู้เรียน: <strong>{studentId}</strong>
-        </span>
+        {studentId && (
+          <span className="active-student-tag">
+            ผู้เรียน: <strong>{studentId}</strong>
+          </span>
+        )}
       </div>
+
+      <p className="small-note" role="status" aria-live="polite">
+        {progressStatus === "loading" && "กำลังโหลดความคืบหน้าที่บันทึกไว้…"}
+        {progressStatus === "saving" && "กำลังบันทึกความคืบหน้า…"}
+        {progressStatus === "saved" && (persistenceMode === "memory"
+          ? "บันทึกความคืบหน้าแล้ว (ข้อมูลสาธิตอาจหายเมื่อเซิร์ฟเวอร์เริ่มใหม่)"
+          : "บันทึกความคืบหน้าแล้ว")}
+        {progressStatus === "error" && "⚠️ บันทึกไม่สำเร็จ โปรดตรวจอินเทอร์เน็ต แล้วลองพิมพ์ต่อ ระบบจะบันทึกใหม่อัตโนมัติ"}
+      </p>
 
       {/* 7-Phase Stepper */}
       <AdiStepper
@@ -247,7 +280,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
         onSelectStep={handleSelectStep}
       />
 
-      {error && <p className="error-text global-error">{error}</p>}
+      {error && <p className="error-text global-error" role="alert">{studentFriendlyError(error)}</p>}
       {activitiesLoading && !error && <p className="muted-text">กำลังโหลดกิจกรรม…</p>}
 
       {/* Active Phase Content */}
@@ -263,6 +296,7 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
           {currentStep === 2 && (
             <Phase2Identification
               savedData={variablesData}
+              onChange={setVariablesData}
               onNext={(vars) => {
                 setVariablesData(vars);
                 advanceToStep(3);
@@ -328,12 +362,11 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
 
       {/* Footer */}
       <footer className="footer-bar">
-        <span>🌱 Learning OS Ecosystem · ม.4 ชีววิทยา · One-group pre/post research prototype</span>
-        <span>Version 2.1 · 7-Phase ADI & LM Studio Telemetry Engine</span>
+        <span>🌱 Learning OS · ชีววิทยา ม.4</span>
+        <span>งานของคุณบันทึกอัตโนมัติ · AI Coach ช่วยถามนำ ไม่เฉลยคำตอบ</span>
       </footer>
 
-      {/* LM Studio Style Live Diagnostic Drawer */}
-      <DiagnosticTerminalDrawer />
+      {showDiagnostics && <DiagnosticTerminalDrawer />}
     </main>
   );
 }

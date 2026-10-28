@@ -37,8 +37,8 @@ const THINKING_STEPS = [
 
 export function AiEvaluatingIndicator({
   title = "อาจารย์ AI กำลังตรวจและคิดคำถาม Socratic...",
-  subtitle = "ระบบกำลังประมวลผลผ่าน Local Ollama Engine (โปรดรอสักครู่ ระบบไม่ได้ค้าง)",
-  modelName = "ornith:9b",
+  subtitle = "กำลังคิดคำถามชวนคิด รอสักครู่ ระบบไม่ได้ค้าง",
+  modelName,
 }: AiEvaluatingIndicatorProps) {
   const [seconds, setSeconds] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
@@ -101,13 +101,12 @@ export function AiEvaluatingIndicator({
 
       {/* Backend & Hardware Reassurance Footer */}
       <div className="evaluating-footer">
-        <div className="footer-metric">
-          <span className="metric-dot" />
-          <span>โมเดล: <strong>{modelName}</strong></span>
-        </div>
-        <div className="footer-metric">
-          <span>⚡ สถานะ: <strong>กำลังรันบนเครื่อง Local (Active)</strong></span>
-        </div>
+        {modelName && (
+          <div className="footer-metric">
+            <span className="metric-dot" />
+            <span>โมเดล: <strong>{modelName}</strong></span>
+          </div>
+        )}
         <div className="footer-metric">
           <span className="reassurance-tag">🔒 ตรวจสอบความปลอดภัยตามเกณฑ์ ADI</span>
         </div>

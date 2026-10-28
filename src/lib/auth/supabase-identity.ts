@@ -53,7 +53,12 @@ function localIdentity(options: ResolveOptions): ResolvedLearningIdentity {
  * supplied student/class/teacher IDs are intentionally absent from this API.
  */
 export async function resolveLearningIdentity(options: ResolveOptions = {}): Promise<ResolvedLearningIdentity> {
-  if (getPersistenceMode() === "memory") return localIdentity(options);
+  if (getPersistenceMode() === "memory") {
+    if (!isLocalDevelopmentPersistence()) {
+      throw new LearningAuthError("Production student access requires configured Supabase persistence", 503);
+    }
+    return localIdentity(options);
+  }
 
   const client = await getSupabaseServerClient();
   if (!client) {
@@ -151,7 +156,10 @@ export function authErrorResponse(error: unknown): Response {
 }
 
 export function isLocalDevelopmentPersistence(): boolean {
-  return getPersistenceMode() === "memory" && (process.env.NODE_ENV !== "production" || process.env.LEARNING_ALLOW_MEMORY_PRODUCTION === "true");
+  return getPersistenceMode() === "memory" && (
+    process.env.NODE_ENV !== "production" ||
+    (process.env.LEARNING_ALLOW_MEMORY_PRODUCTION === "true" && process.env.DEMO_MODE_ENABLED === "true")
+  );
 }
 
 export const LOCAL_DEMO_IDENTITY = DEMO_SCOPE;
