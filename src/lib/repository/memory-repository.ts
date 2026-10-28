@@ -2,6 +2,7 @@ import type {
   AiInteraction,
   AiSession,
   Classroom,
+  ClassTimer,
   Course,
   PaorCycle,
   PeerReview,
@@ -37,6 +38,7 @@ interface MemoryStore {
   teacherObservationNotes: TeacherObservationNote[];
   reflections: StudentReflectionData[];
   customPeerSubmissions: PeerReviewSubmission[];
+  classTimers: ClassTimer[];
 }
 
 // `next dev` compiles each route into its own bundle and re-evaluates modules on
@@ -52,6 +54,7 @@ const memoryStore: MemoryStore = (memoryGlobal.__learningOsMemoryStore ??= {
   teacherObservationNotes: [],
   reflections: [],
   customPeerSubmissions: [],
+  classTimers: [],
 });
 const {
   submissions,
@@ -64,6 +67,9 @@ const {
   reflections,
   customPeerSubmissions,
 } = memoryStore;
+// A store created before classTimers existed (same dev process across HMR) lacks the field.
+memoryStore.classTimers ??= [];
+const classTimers = memoryStore.classTimers;
 
 export const INITIAL_SYNTHETIC_PEER_SUBMISSIONS: PeerReviewSubmission[] = [
   {
@@ -421,7 +427,19 @@ export function latestSubmission(studentId: string, activityId: string): Submiss
   return listSubmissions(studentId, activityId).at(-1);
 }
 
+export function getClassTimer(classId: string): ClassTimer | undefined {
+  return classTimers.find((timer) => timer.classId === classId);
+}
+
+export function saveClassTimer(timer: ClassTimer): ClassTimer {
+  const index = classTimers.findIndex((item) => item.classId === timer.classId);
+  if (index >= 0) classTimers[index] = timer;
+  else classTimers.push(timer);
+  return timer;
+}
+
 export function clearMemoryRepositoriesForTests(): void {
+  classTimers.length = 0;
   submissions.length = 0;
   revisions.length = 0;
   aiSessions.length = 0;

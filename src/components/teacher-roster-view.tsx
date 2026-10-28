@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { ClassRosterSummary, RosterStudentProgress } from "@/lib/domain/types";
+import { TeacherTimerControls } from "@/components/class-timer";
 
 export function TeacherRosterView() {
   const [summary, setSummary] = useState<ClassRosterSummary | null>(null);
@@ -74,6 +75,8 @@ export function TeacherRosterView() {
           </a>
         </div>
       </header>
+
+      <TeacherTimerControls />
 
       {error && <div className="error-banner">{error}</div>}
 

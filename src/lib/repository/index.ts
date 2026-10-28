@@ -1,4 +1,5 @@
 import type {
+  ClassTimer,
   Activity,
   AiInteraction,
   AiSession,
@@ -127,6 +128,18 @@ class MemoryScopedLearningRepository implements ScopedLearningRepository {
   async listTeacherObservationNotes(teacherId?: string, cycle?: PaorCycle, activityId?: string): Promise<TeacherObservationNote[]> {
     if (this.identity.context.role !== "teacher" || !this.identity.context.teacherId) throw new Error("Teacher scope required");
     return memory.listTeacherObservationNotes(teacherId, cycle, activityId);
+  }
+  async getClassTimer(): Promise<ClassTimer | undefined> {
+    return memory.getClassTimer(this.identity.context.classId);
+  }
+  async saveClassTimer(input: Pick<ClassTimer, "label" | "durationSeconds" | "endsAt" | "remainingSeconds">): Promise<ClassTimer> {
+    if (this.identity.context.role !== "teacher" || !this.identity.context.teacherId) throw new Error("Teacher scope required");
+    return memory.saveClassTimer({
+      ...input,
+      classId: this.identity.context.classId,
+      updatedAt: new Date().toISOString(),
+      updatedBy: this.identity.context.teacherId,
+    });
   }
   async appendLearningEvent(event: LearningEvent): Promise<LearningEvent> {
     if (this.identity.context.role === "student") this.studentId(event.studentId);

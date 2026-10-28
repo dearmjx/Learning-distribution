@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   Activity,
+  ClassTimer,
   AiInteraction,
   AiSession,
   LearningContext,
@@ -134,6 +135,18 @@ function mapTeacherObservationNote(
     content: data.content,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
+  };
+}
+
+function mapClassTimer(data: Database["public"]["Tables"]["class_timers"]["Row"]): ClassTimer {
+  return {
+    classId: data.class_id,
+    label: data.label,
+    durationSeconds: data.duration_seconds,
+    endsAt: data.ends_at,
+    remainingSeconds: data.remaining_seconds,
+    updatedAt: data.updated_at,
+    updatedBy: data.updated_by,
   };
 }
 
@@ -581,6 +594,35 @@ export class SupabaseRepository implements ScopedLearningRepository {
     const { data, error } = await query;
     if (error) throw new Error(`Supabase teacher observation note list failed: ${error.message}`);
     return (data ?? []).map(mapTeacherObservationNote);
+  }
+
+  async getClassTimer(): Promise<ClassTimer | undefined> {
+    const { data, error } = await this.client
+      .from("class_timers")
+      .select()
+      .eq("class_id", this.scope.context.classId)
+      .maybeSingle();
+    if (error) throw new Error(`Supabase class timer read failed: ${error.message}`);
+    return data ? mapClassTimer(data) : undefined;
+  }
+
+  async saveClassTimer(input: Pick<ClassTimer, "label" | "durationSeconds" | "endsAt" | "remainingSeconds">): Promise<ClassTimer> {
+    if (this.scope.context.role !== "teacher" || !this.scope.context.teacherId) throw new Error("Only a teacher can change the class timer");
+    const { data, error } = await this.client
+      .from("class_timers")
+      .upsert({
+        class_id: this.scope.context.classId,
+        label: input.label,
+        duration_seconds: input.durationSeconds,
+        ends_at: input.endsAt,
+        remaining_seconds: input.remainingSeconds,
+        updated_at: new Date().toISOString(),
+        updated_by: this.scope.context.teacherId,
+      }, { onConflict: "class_id" })
+      .select()
+      .single();
+    if (error || !data) throw new Error(`Supabase class timer write failed: ${error?.message ?? "empty response"}`);
+    return mapClassTimer(data);
   }
 
   async appendLearningEvent(event: LearningEvent): Promise<LearningEvent> {

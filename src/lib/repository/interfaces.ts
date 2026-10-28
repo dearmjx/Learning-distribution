@@ -1,5 +1,6 @@
 import type {
   Activity,
+  ClassTimer,
   AiInteraction,
   AiSession,
   Classroom,
@@ -109,6 +110,10 @@ export interface ScopedLearningRepository {
   listTeacherReviews(submissionId?: string): Promise<TeacherReview[]>;
   addTeacherObservationNote(input: Omit<TeacherObservationNote, "id" | "createdAt" | "updatedAt">): Promise<TeacherObservationNote>;
   listTeacherObservationNotes(teacherId?: string, cycle?: PaorCycle, activityId?: string): Promise<TeacherObservationNote[]>;
+  /** The countdown for the caller's class, if a teacher has set one. */
+  getClassTimer(): Promise<ClassTimer | undefined>;
+  /** Teacher only: replaces the class countdown. */
+  saveClassTimer(input: Pick<ClassTimer, "label" | "durationSeconds" | "endsAt" | "remainingSeconds">): Promise<ClassTimer>;
   appendLearningEvent(event: LearningEvent): Promise<LearningEvent>;
   listLearningEvents(studentId?: string, activityId?: string): Promise<LearningEvent[]>;
 }

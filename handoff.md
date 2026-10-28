@@ -18,6 +18,7 @@ Frontend audit, AI coach moved to Qwen 3.5 4B on LM Studio, iPhone/iPad UI, teac
 - **Chat recovery:** on 409 `draft1_required` (demo data wiped by a restart), Phase 4 reopens the Draft 1 form with the text kept; unanswered chat messages get a resend button; Freeze rejects starter-only drafts.
 - **iPhone/iPad:** 16 px inputs on touch devices, 44 px targets, swipeable stepper, safe areas, `viewport-fit=cover`. Gate pages (`/demo`, `/teacher/unlock`) are now styled.
 - **Teacher gate:** `/teacher/*`, `/api/teacher/*`, `/api/research/*` need `TEACHER_DASHBOARD_PASSWORD` (signed 8 h cookie, 10 tries/min). Lock button on teacher pages.
+- **Class countdown timer:** teachers control it from `/teacher/review` and `/teacher/roster` (label, minutes, presets that set and start, pause, ±1 minute, reset). Students see a sticky banner that turns amber at ≤ 2 min and red at 0; it does not lock work. The server clock decides `endsAt` and clients correct with `serverNow`, polling every 15 s. Logic and tests are in `src/lib/classroom/timer.ts`; APIs are `/api/timer` (student) and `/api/teacher/timer`; storage is the memory store or Supabase `class_timers` (migration `014_class_timers.sql`, not yet applied to any Supabase project).
 - Student telemetry console only with `?debug=1`. `.claude/launch.json` starts Next with `node node_modules/next/dist/bin/next dev -p 3100` (`npx` hung on Windows).
 
 ### Local runtime (this machine: RTX 4050 Laptop, 6 GB VRAM)

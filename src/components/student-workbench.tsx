@@ -13,6 +13,7 @@ import { Phase6Revision } from "@/components/phases/phase6-revision";
 import { Phase7Reflection } from "@/components/phases/phase7-reflection";
 import { DiagnosticTerminalDrawer } from "@/components/diagnostic-terminal-drawer";
 import { studentFriendlyError } from "@/lib/ui/student-errors";
+import { ClassTimerBanner } from "@/components/class-timer";
 
 const emptyCer: CerResponse = { claim: "", evidence: "", reasoning: "" };
 const phaseKeys = ADI_PHASES.map((phase) => phase.key) as AdiPhase[];
@@ -272,6 +273,8 @@ export function StudentWorkbench({ initialActivityId }: StudentWorkbenchProps = 
           : "บันทึกความคืบหน้าแล้ว")}
         {progressStatus === "error" && "⚠️ บันทึกไม่สำเร็จ โปรดตรวจอินเทอร์เน็ต แล้วลองพิมพ์ต่อ ระบบจะบันทึกใหม่อัตโนมัติ"}
       </p>
+
+      <ClassTimerBanner />
 
       {/* 7-Phase Stepper */}
       <AdiStepper

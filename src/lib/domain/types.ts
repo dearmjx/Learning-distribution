@@ -141,6 +141,17 @@ export interface TeacherObservationNote {
   updatedAt: string;
 }
 
+/** Teacher-controlled class countdown. `endsAt` is set only while running; otherwise `remainingSeconds` holds the time left. */
+export interface ClassTimer {
+  classId: string;
+  label: string;
+  durationSeconds: number;
+  endsAt: string | null;
+  remainingSeconds: number;
+  updatedAt: string;
+  updatedBy: string;
+}
+
 export interface LearningContext {
   schoolId: string;
   courseId: string;

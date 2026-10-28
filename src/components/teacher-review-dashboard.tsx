@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { TeacherReviewSnapshot } from "@/lib/teacher/review-types";
 import type { TeacherObservationNote } from "@/lib/domain/types";
+import { TeacherTimerControls } from "@/components/class-timer";
 
 interface SyntheticRubricDraft {
   selectingInfo: number; // 1-4
@@ -218,6 +219,8 @@ export function TeacherReviewDashboard() {
           </a>
         </div>
       </header>
+
+      <TeacherTimerControls />
 
       {error && <div className="error-banner">{error}</div>}
 

@@ -274,6 +274,7 @@ flowchart LR
           <li>ภาษาบนหัวหน้าเป็นภาษานักเรียน ไม่มีคำว่า CAR / PAOR / Telemetry</li>
           <li>ซ่อนแผง LLM Telemetry ไว้หลัง <code>?debug=1</code></li>
           <li>ปุ่มช่วยเริ่มประโยค CER และข้อความ error ภาษาไทยที่บอกว่าต้องทำอะไรต่อ</li>
+          <li>แถบนับเวลาถอยหลังที่ครูควบคุม ติดด้านบนจอ เปลี่ยนเป็นสีเหลืองเมื่อเหลือ ≤ 2 นาที สีแดงเมื่อหมดเวลา</li>
         </ul>
       </div>
     </div>
@@ -297,6 +298,8 @@ flowchart LR
           <tr><td><code>/api/reflections</code></td><td>GET/POST</td><td>Phase 7</td><td>identity</td></tr>
           <tr><td><code>/api/teacher/{reviews,roster,observations}</code></td><td>GET/POST</td><td>งานครู</td><td>role teacher · <span class="chip ok">teacher gate ใหม่</span></td></tr>
           <tr><td><code>/api/research/export</code></td><td>GET</td><td>dataset วิจัย (participant key แบบ HMAC)</td><td>researcher · consent · <span class="chip ok">teacher gate</span></td></tr>
+          <tr><td><code>/api/timer</code> <span class="chip ok">ใหม่</span></td><td>GET</td><td>นักเรียนอ่านเวลานับถอยหลังของห้อง + <code>serverNow</code> เพื่อแก้นาฬิกาเครื่องที่เพี้ยน</td><td>identity (student)</td></tr>
+          <tr><td><code>/api/teacher/timer</code> <span class="chip ok">ใหม่</span></td><td>GET/POST</td><td>ครูตั้ง / เริ่ม / หยุดชั่วคราว / ±เวลา / รีเซ็ต (เวลาคำนวณด้วยนาฬิกาเซิร์ฟเวอร์)</td><td>role teacher · teacher gate</td></tr>
           <tr><td><code>/api/teacher/unlock</code>, <code>/lock</code></td><td>POST/GET</td><td>ปลดล็อก/ล็อกแดชบอร์ด</td><td>HMAC cookie 8 ชม. · 10 ครั้ง/นาที</td></tr>
           <tr><td><code>/api/health</code>, <code>/api/ready</code></td><td>GET</td><td>health + LLM reachable</td><td>public</td></tr>
         </tbody>
@@ -338,7 +341,7 @@ sequenceDiagram
   <section id="database">
     <div class="sec-head">
       <span class="eyebrow">Database</span>
-      <h2>Supabase Postgres · 13 migrations · 21 tables</h2>
+      <h2>Supabase Postgres · 14 migrations · 22 tables</h2>
       <p>ทุกตารางเปิด RLS นโยบายรุ่นแรกที่หลวมเกินไปถูก drop ไปแล้วใน migration 006 สิทธิ์จริงอยู่ในฟังก์ชัน <code>active_class_member</code>, <code>is_teacher</code>, <code>can_access_submission</code>, <code>consented_student_ids</code></p>
     </div>
     <div class="diagram">
@@ -364,6 +367,7 @@ erDiagram
   learning_profiles ||--o{ consent_records : gives
   learning_profiles ||--o| research_identity_mapping : keyed
   classes ||--o{ teacher_observation_notes : notes
+  classes ||--o| class_timers : countdown
 </pre>
     </div>
     <div class="grid">
@@ -1011,7 +1015,24 @@ flowchart LR
       </table>
     </div>
 
-    <h3>7. LINE OA (เมื่อสร้าง)</h3>
+    <h3>7. นาฬิกานับถอยหลังของห้อง</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>กรณี</th><th>ผลที่ต้องได้</th><th>วิธี</th><th>สถานะ</th></tr></thead>
+        <tbody>
+          <tr><td class="num">TM-1</td><td>ครูตั้ง เริ่ม หยุดชั่วคราว +1/−1 นาที รีเซ็ต</td><td>นักเรียนเห็นเวลาเดียวกันภายใน ~15 วิ</td><td>Vitest (11 tests) + browser</td><td><span class="chip ok">ผ่าน</span></td></tr>
+          <tr><td class="num">TM-2</td><td>นาฬิกา iPad นักเรียนเพี้ยนหลายนาที</td><td>นับตามเวลาเซิร์ฟเวอร์ (<code>serverNow</code>)</td><td>E2E (ปลอมเวลาเครื่อง)</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">TM-3</td><td>นักเรียนรีเฟรช / ปิดจอแล้วเปิดใหม่ / เน็ตหลุด</td><td>ดึงเวลาใหม่ทันทีเมื่อกลับมา นับต่อจากค่าล่าสุดขณะออฟไลน์</td><td>E2E</td><td><span class="chip ok">ผ่าน</span> รีเฟรช · ออฟไลน์รอ</td></tr>
+          <tr><td class="num">TM-4</td><td>หมดเวลา</td><td>แถบแดง “หมดเวลา” · ไม่ล็อกงาน (ครูตัดสินใจเอง)</td><td>browser</td><td><span class="chip ok">ผ่าน</span></td></tr>
+          <tr><td class="num">TM-5</td><td>นักเรียนเรียก <code>POST /api/teacher/timer</code> เอง</td><td>401 (gate) / 403 (role)</td><td>curl</td><td><span class="chip ok">ผ่าน</span> 401</td></tr>
+          <tr><td class="num">TM-6</td><td>ตั้ง 0 วินาที / เกิน 4 ชม. / ชื่อยาวเกิน 80</td><td>400 ข้อความไทย</td><td>Vitest + curl</td><td><span class="chip ok">ผ่าน</span></td></tr>
+          <tr><td class="num">TM-7</td><td>ครูสองคนกดพร้อมกัน</td><td>คนกดหลังชนะ ทั้งสองจอแสดงค่าเดียวกันหลัง poll</td><td>มือ</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+          <tr><td class="num">TM-8</td><td>Supabase: RLS ของ <code>class_timers</code> (นักเรียนอ่านได้เฉพาะห้องตัวเอง เขียนไม่ได้)</td><td>ตาม policy ใน migration 014</td><td>SQL test</td><td><span class="chip neutral">รอทดสอบ</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>8. LINE OA (เมื่อสร้าง)</h3>
     <div class="table-wrap">
       <table>
         <thead><tr><th>ID</th><th>กรณี</th><th>ผลที่ต้องได้</th><th>วิธี</th><th>สถานะ</th></tr></thead>

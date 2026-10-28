@@ -2808,3 +2808,178 @@ html {
   opacity: 0.6;
   cursor: wait;
 }
+
+/* =========================================================
+   CLASS COUNTDOWN (teacher-controlled)
+   ========================================================= */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Sticky so the time stays visible while a student scrolls a long phase. */
+.class-timer-banner {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 10px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--shadow-md);
+}
+
+.class-timer-icon {
+  font-size: 1.4rem;
+}
+
+.class-timer-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.3;
+}
+
+.class-timer-label {
+  font-weight: 700;
+  color: var(--teal-dark);
+  overflow-wrap: anywhere;
+}
+
+.class-timer-status {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.class-timer-clock {
+  font-size: 1.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--teal-dark);
+}
+
+.class-timer-banner.timer-warn {
+  border-color: #e3b341;
+  background: #fff8e6;
+}
+
+.class-timer-banner.timer-warn .class-timer-clock {
+  color: #8a5a00;
+}
+
+.class-timer-banner.timer-done {
+  border-color: #e6a39a;
+  background: #fdf0ec;
+}
+
+.class-timer-banner.timer-done .class-timer-clock {
+  color: #a14d3a;
+}
+
+.teacher-timer-card {
+  display: grid;
+  gap: 14px;
+  margin: 16px 0 24px;
+  padding: 18px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.teacher-timer-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.teacher-timer-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.teacher-timer-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 2.2rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--teal-dark);
+}
+
+.teacher-timer-clock.timer-warn {
+  color: #8a5a00;
+}
+
+.teacher-timer-clock.timer-done {
+  color: #a14d3a;
+}
+
+.teacher-timer-state {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.teacher-timer-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.teacher-timer-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--teal-dark);
+}
+
+.teacher-timer-presets,
+.teacher-timer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.teacher-timer-presets > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+@media (max-width: 600px) {
+  .teacher-timer-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .teacher-timer-form label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .teacher-timer-clock {
+    align-items: flex-start;
+  }
+
+  .class-timer-clock {
+    font-size: 1.5rem;
+  }
+}
